@@ -60,4 +60,22 @@ defmodule AnthropicTest do
       assert List.last(request.messages).role == :assistant
     end
   end
+
+  describe "add_image/2" do
+    test "from valid path" do
+      elem =
+        Anthropic.new()
+        |> Anthropic.add_image({:path, "test/images/image.png"})
+        |> then(fn req -> req.messages end)
+        |> List.first()
+
+      assert %{
+               role: :user,
+               content: %{
+                 type: "image",
+                 source: %{data: _data, type: "base64", media_type: "image/png"}
+               }
+             } = elem
+    end
+  end
 end

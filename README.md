@@ -11,7 +11,6 @@ This unofficial Elixir wrapper provides a convenient way to interact with the [A
 
 ## To dos:
 
-- Add image handling
 - Add Streaming handling
 - Add tool description
 - Add telemetry

@@ -7,6 +7,7 @@ defmodule Anthropic do
   use Application
 
   alias Anthropic.Messages.Request
+  alias Anthropic.Messages.Content.Image
   alias Anthropic.Config
 
   @doc false
@@ -79,8 +80,12 @@ defmodule Anthropic do
 
   - The updated `Anthropic.Messages.Request` struct with the new message added.
   """
-  def add_message(%Request{messages: messages} = request, role, message)
-      when is_binary(message) do
+  def add_message(%Request{} = request, role, messages) when is_list(messages) do
+    messages
+    |> Enum.reduce(request, fn elem, acc -> add_message(acc, role, elem) end)
+  end
+
+  def add_message(%Request{messages: messages} = request, role, message) do
     messages =
       messages
       |> Enum.reverse()
@@ -88,11 +93,6 @@ defmodule Anthropic do
       |> Enum.reverse()
 
     %{request | messages: messages}
-  end
-
-  def add_message(%Request{} = request, role, messages) when is_list(messages) do
-    messages
-    |> Enum.reduce(request, fn elem, acc -> add_message(acc, role, elem) end)
   end
 
   @doc """
@@ -125,6 +125,40 @@ defmodule Anthropic do
   """
   def add_assistant_message(%Request{} = request, message) when is_binary(message) do
     add_message(%Request{} = request, :assistant, message)
+  end
+
+  @doc """
+  Adds an image message to the request.
+
+  Processes the given image, converts it to a base64 encoded string, and adds it as a message to the request with a role of `:user`.
+
+  ## Parameters
+
+  - `request`: The `Anthropic.Messages.Request` struct to which the image message will be added.
+  - `image_data`: A tuple consisting of the input type and the image path or binary data. The input type should be one of `:path`, `:binary`, or `:base64`, indicating how the image is provided.
+
+  ## Returns
+
+  - The updated `Anthropic.Messages.Request` struct with the image message added.
+
+  ## Examples
+
+      Anthropic.add_image(request, {:path, "/path/to/image.png"})
+      # Adds an image from a local file path
+
+      Anthropic.add_image(request, {:binary, <<binary data>>})
+      # Adds an image from binary data
+
+      Anthropic.add_image(request, {:base64, "base64 encoded image data"})
+      # Adds an image from a base64 encoded string
+
+  ## Errors
+
+  - Returns `{:error, reason}` if the image processing fails, where `reason` is a descriptive error message.
+  """
+  def add_image(%Request{} = request, {type, image_path}) do
+    {:ok, content} = Image.process_image(image_path, type)
+    add_message(request, :user, content)
   end
 
   @doc """
