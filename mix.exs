@@ -1,7 +1,7 @@
 defmodule Anthropic.MixProject do
   use Mix.Project
 
-  @name "Anthropic Community"
+  @name "anthropic_community"
   @version "0.1.0"
   @repo_url "https://github.com/tubedude/anthropic-community"
 
