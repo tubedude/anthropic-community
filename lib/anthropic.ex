@@ -10,6 +10,9 @@ defmodule Anthropic do
   alias Anthropic.Messages.Content.Image
   alias Anthropic.Config
 
+  @type role :: :user | :assistant
+  @type message :: %{role: role, content: any()}
+
   @doc false
   def start(_type, _args) do
     children = [
@@ -22,6 +25,7 @@ defmodule Anthropic do
     Supervisor.start_link(children, opts)
   end
 
+  @spec new(Anthropic.Config.config_options() | nil) :: Anthropic.Messages.Request.t()
   @doc """
   Initializes a new `Anthropic.Config` struct with the given options, merging them with the default configuration.
 
@@ -40,6 +44,8 @@ defmodule Anthropic do
     |> Request.create()
   end
 
+  @spec add_system_message(Anthropic.Messages.Request.t(), binary()) ::
+          Anthropic.Messages.Request.t()
   @doc """
   Adds a system message to the request.
 
@@ -67,6 +73,7 @@ defmodule Anthropic do
         "System message must be type String, got #{inspect(message, limit: 50, structs: false, width: 80)}"
       )
 
+  @spec add_message(Anthropic.Messages.Request.t(), role(), any()) :: any()
   @doc """
   Adds a message to the request with a specified role.
 
@@ -95,6 +102,8 @@ defmodule Anthropic do
     %{request | messages: messages}
   end
 
+  @spec add_user_message(Anthropic.Messages.Request.t(), binary()) ::
+          Anthropic.Messages.Request.t()
   @doc """
   Adds a user message to the request.
 
@@ -111,22 +120,28 @@ defmodule Anthropic do
     add_message(%Request{} = request, :user, message)
   end
 
+  @spec add_assistant_message(Anthropic.Messages.Request.t(), binary()) ::
+          Anthropic.Messages.Request.t()
   @doc """
   Adds a assistant message to the request.
 
   ## Parameters
 
   - `request`: The `Anthropic.Messages.Request` struct to which the assistant message will be added.
-  - `message`: The content of the assistant message, must be a binary string.
+  - `message`: The content of the assistant message.
 
   ## Returns
 
   - The updated `Anthropic.Messages.Request` struct with the assistant message added.
   """
-  def add_assistant_message(%Request{} = request, message) when is_binary(message) do
+  def add_assistant_message(%Request{} = request, message) do
     add_message(%Request{} = request, :assistant, message)
   end
 
+  @spec add_image(
+          Anthropic.Messages.Request.t(),
+          {Anthropic.Messages.Content.Image.input_type(), binary()}
+        ) :: Anthropic.Messages.Request.t()
   @doc """
   Adds an image message to the request.
 
@@ -156,11 +171,15 @@ defmodule Anthropic do
 
   - Returns `{:error, reason}` if the image processing fails, where `reason` is a descriptive error message.
   """
+  @doc since: "0.2.0"
   def add_image(%Request{} = request, {type, image_path}) do
     {:ok, content} = Image.process_image(image_path, type)
     add_message(request, :user, content)
   end
 
+  @spec request_next_message(Anthropic.Messages.Request.t()) ::
+          {:error, any(), Anthropic.Messages.Request.t()}
+          | {:ok, binary(), Anthropic.Messages.Request.t()}
   @doc """
   Sends the current request to the Anthropic API and awaits the next message in the conversation.
 

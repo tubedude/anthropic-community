@@ -42,6 +42,22 @@ defmodule Anthropic.Messages.Content.Image do
     {"1:2", {784, 1568}}
   ]
 
+  @type input_type :: :binary | :path | :base64
+  @type mime_type :: String.t()
+  @type dimensions :: {integer, integer}
+  @type supported_size :: {String.t(), dimensions}
+  @type image_input :: binary | String.t()
+  @type process_output :: {:ok, response()} | {:error, String.t()}
+  @type response :: %{
+          type: String.t(),
+          source: %{
+            type: String.t(),
+            media_type: String.t(),
+            data: binary()
+          }
+        }
+
+  @spec process_image(image_input(), input_type()) :: process_output()
   @doc """
   Processes the given image input based on the specified input type and converts it into a base64 encoded string.
 

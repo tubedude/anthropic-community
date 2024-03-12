@@ -24,6 +24,29 @@ defmodule Anthropic.Config do
             top_k: nil,
             api_key: nil
 
+
+  @type t :: %__MODULE__{
+    model: String.t() | nil,
+    anthropic_version: String.t() | nil,
+    api_url: String.t() | nil,
+    max_tokens: non_neg_integer() | nil,
+    temperature: float() | nil,
+    top_p: float() | nil,
+    top_k: non_neg_integer() | nil,
+    api_key: String.t() | nil
+  }
+
+  @type config_option ::
+  {:model, String.t()}
+  | {:anthropic_version, String.t()}
+  | {:api_url, String.t()}
+  | {:max_tokens, non_neg_integer()}
+  | {:temperature, float()}
+  | {:top_p, float()}
+  | {:top_k, non_neg_integer()}
+  | {:api_key, String.t()}
+
+  @type config_options :: [config_option()]
   ### API
 
   def start_link(opts),

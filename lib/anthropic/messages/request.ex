@@ -26,6 +26,24 @@ defmodule Anthropic.Messages.Request do
             top_p: nil,
             top_k: nil
 
+  @type t :: %__MODULE__{
+          model: String.t() | nil,
+          messages: list(message()),
+          system: String.t() | nil,
+          max_tokens: integer() | nil,
+          metadata: map() | nil,
+          stop_sequences: list(String.t()) | nil,
+          stream: boolean(),
+          temperature: float() | nil,
+          top_p: float() | nil,
+          top_k: integer() | nil
+        }
+
+  @type message() :: %{
+          content: String.t(),
+          role: String.t()
+        }
+
   defimpl Jason.Encoder, for: Anthropic.Messages.Request do
     def encode(req, opts) do
       %{
@@ -45,6 +63,7 @@ defmodule Anthropic.Messages.Request do
     end
   end
 
+  @spec create(Anthropic.Config.t()) :: Anthropic.Messages.Request.t()
   @doc """
   Creates a new request struct based on the provided configuration.
 
@@ -68,6 +87,8 @@ defmodule Anthropic.Messages.Request do
     }
   end
 
+  @spec send_request(Anthropic.Messages.Request.t(), Keyword.t() | nil) ::
+          {:error, any()} | {:ok, Finch.Response.t()}
   @doc """
   Encodes the request to JSON and sends it to the Anthropic API via the Finch HTTP client.
 

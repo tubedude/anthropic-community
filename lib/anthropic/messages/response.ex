@@ -25,9 +25,13 @@ defmodule Anthropic.Messages.Response do
   - For errors during the request process, returns `{:error, response}` where `response` is the original error response.
   """
   def parse({:ok, %Finch.Response{status: 200} = response}) do
-    @fields
-    |> Enum.map(fn field -> {field, response.body[Atom.to_string(field)]} end)
-    |> then(fn list -> {:ok, struct(%__MODULE__{}, list)} end)
+    case Jason.decode(response.body) do
+      {:error, _} = error -> error
+      {:ok, body} ->
+        @fields
+        |> Enum.map(fn field -> {field, body[Atom.to_string(field)]} end)
+        |> then(fn list -> {:ok, struct(%__MODULE__{}, list)} end)
+    end
   end
 
   def parse({:ok, %Finch.Response{status: status} = response}) when status in 500..599,
