@@ -52,7 +52,6 @@ defmodule Anthropic do
   @type role :: :user | :assistant
   @type message :: %{role: role, content: any()}
 
-
   @spec new(Anthropic.Config.config_options() | nil) :: Anthropic.Messages.Request.t()
   @doc """
   Initializes a new `Anthropic.Config` struct with the given options, merging them with the default configuration.
