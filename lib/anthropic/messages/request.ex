@@ -88,7 +88,7 @@ defmodule Anthropic.Messages.Request do
   end
 
   @spec send_request(Anthropic.Messages.Request.t(), Keyword.t() | nil) ::
-          {:error, any()} | {:ok, Finch.Response.t()}
+          {:error, any()} | {:ok, Anthropic.Messages.Response.t()}
   @doc """
   Encodes the request to JSON and sends it to the Anthropic API via the Finch HTTP client.
 
@@ -113,6 +113,7 @@ defmodule Anthropic.Messages.Request do
       {:error, %{reason: reason}} -> {:error, reason}
       {:error, _} = error -> error
     end
+    |> Anthropic.Messages.Response.parse()
   end
 
   defp build_finch_request(body, opts) do
