@@ -45,8 +45,6 @@ defmodule Anthropic do
   Errors are captured with their specific types, aiding in debugging and monitoring of the integration's health.
   """
 
-  use Application
-
   alias Anthropic.Messages.Request
   alias Anthropic.Messages.Content.Image
   alias Anthropic.Config
@@ -54,17 +52,6 @@ defmodule Anthropic do
   @type role :: :user | :assistant
   @type message :: %{role: role, content: any()}
 
-  @doc false
-  def start(_type, _args) do
-    children = [
-      Config,
-      {Finch, name: Anthropic.HTTPClient}
-    ]
-
-    opts = [strategy: :one_for_one, name: Anthropic.Supervisor]
-
-    Supervisor.start_link(children, opts)
-  end
 
   @spec new(Anthropic.Config.config_options() | nil) :: Anthropic.Messages.Request.t()
   @doc """
