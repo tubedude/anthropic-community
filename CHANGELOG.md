@@ -1,3 +1,8 @@
+## 0.#.# 
+
+### Minor
+- Moved Response parsing to Request module.
+
 ## 0.3.0 - 2024-03-12
 
 ### Improved

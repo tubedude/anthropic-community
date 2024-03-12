@@ -45,26 +45,12 @@ defmodule Anthropic do
   Errors are captured with their specific types, aiding in debugging and monitoring of the integration's health.
   """
 
-  use Application
-
   alias Anthropic.Messages.Request
   alias Anthropic.Messages.Content.Image
   alias Anthropic.Config
 
   @type role :: :user | :assistant
   @type message :: %{role: role, content: any()}
-
-  @doc false
-  def start(_type, _args) do
-    children = [
-      Config,
-      {Finch, name: Anthropic.HTTPClient}
-    ]
-
-    opts = [strategy: :one_for_one, name: Anthropic.Supervisor]
-
-    Supervisor.start_link(children, opts)
-  end
 
   @spec new(Anthropic.Config.config_options() | nil) :: Anthropic.Messages.Request.t()
   @doc """
@@ -246,7 +232,6 @@ defmodule Anthropic do
 
   defp request_next_message_core(%Request{} = request, http_client_opts) do
     Anthropic.Messages.Request.send_request(request, http_client_opts)
-    |> Anthropic.Messages.Response.parse()
     |> prepare_response(request)
     |> wrap_to_telemetry()
   end
@@ -254,7 +239,6 @@ defmodule Anthropic do
   # Prepares the response from the API for successful requests, updating the request with the assistant's message.
   defp prepare_response({:ok, response}, request) do
     updated_request = add_assistant_message(request, response.content)
-
     {:ok, response, updated_request}
   end
 
