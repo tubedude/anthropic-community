@@ -9,6 +9,19 @@ defmodule Anthropic.Messages.Response do
 
   defstruct @fields
 
+  @type t :: %Anthropic.Messages.Response{
+    id: String.t(),
+    type: String.t(),
+    role: String.t(),
+    content: String.t(),
+    model: String.t(),
+    stop_reason: String.t() | nil,
+    stop_sequence: String.t() | nil,
+    usage: map()
+  }
+
+
+  @spec parse({:error, any()} | {:ok, Finch.Response.t()}) :: {:error, Jason.DecodeError.t() | Finch.Error.t() } | {:ok, t()}
   @doc """
   Parses an HTTP response from the Anthropic API.
 
@@ -26,7 +39,9 @@ defmodule Anthropic.Messages.Response do
   """
   def parse({:ok, %Finch.Response{status: 200} = response}) do
     case Jason.decode(response.body) do
-      {:error, _} = error -> error
+      {:error, _} = error ->
+        error
+
       {:ok, body} ->
         @fields
         |> Enum.map(fn field -> {field, body[Atom.to_string(field)]} end)
