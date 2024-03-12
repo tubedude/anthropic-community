@@ -1,7 +1,48 @@
 defmodule Anthropic do
   @moduledoc """
   Provides an unofficial Elixir wrapper for the Anthropic API, facilitating access to the Claude LLM model.
-  This module handles configuration, request preparation, and communication with the API.
+  This module handles configuration, request preparation, and communication with the API, offering an idiomatic Elixir interface to the Anthropic AI capabilities.
+
+  ## Key Features
+
+  - **Configuration Management**: Centralizes settings for the Anthropic API, such as model specifications, API keys, and request parameters, ensuring a consistent request configuration.
+  - **Message Handling**: Supports adding various types of messages to the request, including text and image content, enhancing interaction with the Anthropic AI.
+  - **Error Handling**: Implements comprehensive error handling for both request generation and response parsing, providing clear feedback on failures.
+  - **Telemetry Integration**: Integrates with Elixir's `:telemetry` library to emit events for key operations, enabling monitoring and observability.
+
+  ## Usage
+
+  Start by configuring the API settings, then use the provided functions to add messages or images to your request. Finally, send the request to the Anthropic API and handle the response:
+
+  ```elixir
+  config = Anthropic.new(api_key: "your_api_key")
+  request = Anthropic.add_user_message(config, "Hello, Anthropic!")
+  Anthropic.request_next_message(request)
+  ```
+
+  ## Telemetry
+
+  This module emits several `:telemetry` events to help monitor its operations, which can be observed for logging, metrics, or operational insights.
+
+  ### Events
+
+  - `[:anthropic, :request_next_message, :start]` - Emitted at the beginning of a request to the Anthropic API.
+  - `[:anthropic, :request_next_message, :stop]` - Emitted after a request to the Anthropic API successfully completes.
+  - `[:anthropic, :request_next_message, :exception]` - Emitted if an exception occurs during a request to the Anthropic API.
+
+  ### Metrics
+
+  Each telemetry event includes metadata with the following fields:
+
+  - `:model` - The model specified in the request.
+  - `:max_tokens` - The maximum number of tokens allowed in the response.
+
+  In addition, the `:stop` event includes metrics on:
+
+  - `:input_tokens` - The number of tokens in the request.
+  - `:output_tokens` - The number of tokens in the API response.
+
+  Errors are captured with their specific types, aiding in debugging and monitoring of the integration's health.
   """
 
   use Application
@@ -177,9 +218,7 @@ defmodule Anthropic do
     add_message(request, :user, content)
   end
 
-  @spec request_next_message(Anthropic.Messages.Request.t()) ::
-          {:error, any(), Anthropic.Messages.Request.t()}
-          | {:ok, binary(), Anthropic.Messages.Request.t()}
+  @spec request_next_message(Anthropic.Messages.Request.t()) :: any()
   @doc """
   Sends the current request to the Anthropic API and awaits the next message in the conversation.
 
@@ -198,20 +237,56 @@ defmodule Anthropic do
   This function is the main mechanism through which conversations are advanced, by sending user or assistant messages to the API and incorporating the API's responses into the ongoing conversation.
   """
   def request_next_message(%Request{} = request, http_client_opts \\ []) do
+    :telemetry.span(
+      [:anthropic, :request_next_message],
+      %{model: request.model, max_tokens: request.max_tokens},
+      fn -> request_next_message_core(request, http_client_opts) end
+    )
+  end
+
+  defp request_next_message_core(%Request{} = request, http_client_opts) do
     Anthropic.Messages.Request.send_request(request, http_client_opts)
     |> Anthropic.Messages.Response.parse()
     |> prepare_response(request)
+    |> wrap_to_telemetry()
   end
 
   # Prepares the response from the API for successful requests, updating the request with the assistant's message.
   defp prepare_response({:ok, response}, request) do
     updated_request = add_assistant_message(request, response.content)
 
-    {:ok, response.content, updated_request}
+    {:ok, response, updated_request}
   end
 
   # Handles error responses from the API, passing through the error and the original request for further handling.
   defp prepare_response({:error, response}, request) do
     {:error, response, request}
+  end
+
+  defp wrap_to_telemetry({:ok, response, _updated_request} = result) do
+    {result,
+     %{
+       input_tokens: response.usage["input_tokens"],
+       output_tokens: response.usage["output_tokens"]
+     }}
+  end
+
+  defp wrap_to_telemetry({:error, %{body: body} = _response, _updated_request} = result)
+       when is_map(body) do
+    {result, %{error: body["error"]["type"]}}
+  end
+
+  defp wrap_to_telemetry(
+         {:error, %Finch.Error{reason: reason} = _response, _updated_request} = result
+       ) do
+    {result, %{error: reason}}
+  end
+
+  defp wrap_to_telemetry({:error, %Jason.DecodeError{} = _response, _updated_request} = result) do
+    {result, %{error: :json_decoding_error}}
+  end
+
+  defp wrap_to_telemetry({:error, _response, _updated_request} = result) do
+    {result, %{error: :unknown_error}}
   end
 end

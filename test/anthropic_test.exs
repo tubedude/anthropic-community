@@ -78,4 +78,13 @@ defmodule AnthropicTest do
              } = elem
     end
   end
+
+  describe "request_next_message/1" do
+    test "requires api_key" do
+      Anthropic.Config.reset(api_key: nil)
+      assert_raise(ArgumentError, fn ->
+        Anthropic.new(Anthropic.Config.reset(api_key: nil)) |> Anthropic.add_user_message("Good morning") |> Anthropic.request_next_message()
+      end)
+    end
+  end
 end

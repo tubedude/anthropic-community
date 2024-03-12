@@ -1,18 +1,24 @@
 defmodule ConfigTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: false
   doctest Anthropic
 
   alias Anthropic.Config
 
   test "opts/0 returns current opts" do
-    assert %{api_key: "Loaded_for_tests"} = Config.opts()
+    assert %Anthropic.Config{} = Config.opts()
   end
 
   describe "reset/1" do
     test "will rewrite runtime options" do
-      config = Config.reset(temperature: 0.3)
-      assert 0.3 == config.temperature
+      Config.reset(temperature: 0.3)
+      assert 0.3 == Config.opts().temperature
       Config.reset(temperature: 1.0)
+    end
+
+    test "will rewrite api_key runtime options" do
+      Config.reset(api_key: "some other key")
+      assert "some other key" == Config.opts().api_key
+      Config.reset(api_key: "Loaded_for_tests")
     end
 
     # @tag :capture_log

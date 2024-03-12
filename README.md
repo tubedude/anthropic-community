@@ -13,7 +13,6 @@ This unofficial Elixir wrapper provides a convenient way to interact with the [A
 
 - Add Streaming handling
 - Add tool description
-- Add telemetry
 
 ## Installation
 

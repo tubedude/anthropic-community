@@ -1,3 +1,9 @@
+## 0.3.0 - 2024-03-12
+
+### Improved
+- Included telemetry
+- Added threatment of nil `api_key`
+
 ## 0.2.1 - 2024-03-11
 
 ### Fixed
@@ -6,6 +12,7 @@
 
 ### Improved
 - Added type annotations to documentatio
+
 ## 0.2.0 - 2024-03-11
 
 ### Improved

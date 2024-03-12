@@ -10,18 +10,17 @@ defmodule Anthropic.Messages.Response do
   defstruct @fields
 
   @type t :: %Anthropic.Messages.Response{
-    id: String.t(),
-    type: String.t(),
-    role: String.t(),
-    content: String.t(),
-    model: String.t(),
-    stop_reason: String.t() | nil,
-    stop_sequence: String.t() | nil,
-    usage: map()
-  }
+          id: String.t(),
+          type: String.t(),
+          role: String.t(),
+          content: String.t(),
+          model: String.t(),
+          stop_reason: String.t() | nil,
+          stop_sequence: String.t() | nil,
+          usage: map()
+        }
 
-
-  @spec parse({:error, any()} | {:ok, Finch.Response.t()}) :: {:error, Jason.DecodeError.t() | Finch.Error.t() } | {:ok, t()}
+  @spec parse({:error, any()} | {:ok, Finch.Response.t()}) :: {:error, any()} | {:ok, t()}
   @doc """
   Parses an HTTP response from the Anthropic API.
 
@@ -52,8 +51,18 @@ defmodule Anthropic.Messages.Response do
   def parse({:ok, %Finch.Response{status: status} = response}) when status in 500..599,
     do: {:error, response}
 
-  def parse({:ok, %Finch.Response{status: status} = response}) when status in 400..499,
-    do: {:error, response}
+  def parse({:ok, %Finch.Response{status: status} = response}) when status in 400..499 do
+    res =
+      case Jason.decode(response.body) do
+        {:error, _} ->
+          response
+
+        {:ok, body} ->
+          %{response | body: body}
+      end
+
+    {:error, res}
+  end
 
   def parse({:error, response}),
     do: {:error, response}
