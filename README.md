@@ -29,9 +29,10 @@ end
 ```
 
 ## Configuration
-This expects a environment variable named `ANTHROPIC_API_KEY` holding your API Keys. But it is possible to override it on any config/config.exs as below.
+Add or create a config file to provide the `api_key` as in the example below.
 
 ```
+# config/config.exs
 import Config
 
 config :anthropic,
