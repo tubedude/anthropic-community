@@ -1,6 +1,6 @@
 defmodule ConfigTest do
   use ExUnit.Case, async: false
-  doctest Anthropic
+  doctest Anthropic.Config
 
   alias Anthropic.Config
 

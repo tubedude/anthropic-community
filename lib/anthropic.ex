@@ -3,21 +3,88 @@ defmodule Anthropic do
   Provides an unofficial Elixir wrapper for the Anthropic API, facilitating access to the Claude LLM model.
   This module handles configuration, request preparation, and communication with the API, offering an idiomatic Elixir interface to the Anthropic AI capabilities.
 
-  ## Key Features
+  ## Configuration
 
+  The following configuration options are available:
+
+  - `:api_key` - The API key for authenticating requests to the Anthropic API (required).
+  - `:model` - The name of the model to use for generating responses (default: "claude-3-opus-20240229").
+  - `:max_tokens` - The maximum number of tokens allowed in the generated response (default: 1000).
+  - `:temperature` - The sampling temperature for controlling response randomness (default: 1.0).
+  - `:top_p` - The cumulative probability threshold for nucleus sampling (default: 1.0).
+  - `:top_k` - The number of top tokens to consider for sampling (default: 1).
+  - `:anthropic_version` - The version of the Anthropic API to use (default: "2023-06-01").
+  - `:api_url` - The URL of the Anthropic API (default: "https://api.anthropic.com/v1").
+
+  These options can be set in your application's configuration file:
+
+  ```elixir
+  config :anthropic,
+    api_key: "your_api_key",
+    model: "claude-v1",
+    max_tokens: 500,
+    temperature: 0.7,
+    top_p: 0.9,
+    top_k: 5
+  ```
+  Alternatively, you can update the configuration at runtime using Anthropic.Config.reset/1:
+
+  ```elixir
+  Anthropic.Config.reset(max_tokens: 750, temperature: 0.5)
+  ```
+  ## Key Features
   - **Configuration Management**: Centralizes settings for the Anthropic API, such as model specifications, API keys, and request parameters, ensuring a consistent request configuration.
   - **Message Handling**: Supports adding various types of messages to the request, including text and image content, enhancing interaction with the Anthropic AI.
   - **Error Handling**: Implements comprehensive error handling for both request generation and response parsing, providing clear feedback on failures.
   - **Telemetry Integration**: Integrates with Elixir's `:telemetry` library to emit events for key operations, enabling monitoring and observability.
+  - **Tool Invocations**: Allows registering and executing custom tool modules that implement the `Anthropic.Tools.ToolBehaviour`, enabling dynamic handling of function invocations from the assistant's responses.
 
   ## Usage
-
   Start by configuring the API settings, then use the provided functions to add messages or images to your request. Finally, send the request to the Anthropic API and handle the response:
 
   ```elixir
   config = Anthropic.new(api_key: "your_api_key")
   request = Anthropic.add_user_message(config, "Hello, Anthropic!")
-  Anthropic.request_next_message(request)
+  {:ok, response, updated_request} = Anthropic.request_next_message(request)
+  ```
+
+  ## Configuration
+  The following configuration options are available:
+
+  - `:api_key` - The API key for authenticating requests to the Anthropic API.
+  - `:model` - The name of the model to use for generating responses (default: "claude-v1").
+  - `:max_tokens` - The maximum number of tokens allowed in the generated response (default: 1000).
+  - `:temperature` - The sampling temperature for controlling response randomness (default: 1.0).
+  - `:top_p` - The cumulative probability threshold for nucleus sampling (default: 1.0).
+
+  ## Error Handling
+  The module returns errors in the format `{:error, reason}`, where `reason` can be:
+
+  - A map containing error details from the Anthropic API, with an "error" key indicating the type of error.
+  - A `Finch.Error` struct if there was an issue with the HTTP request.
+  - A `Jason.DecodeError` struct if there was an issue decoding the JSON response.
+  - An `:unknown_error` atom if an unexpected error occurred.
+
+  ## Testing
+  When writing tests for code that uses this module, you can mock the API responses using a library like `Mox`. Here's an example of how to mock a successful response:
+
+  ```elixir
+  defmodule MyAppTest do
+    use ExUnit.Case
+    import Mox
+
+    setup :verify_on_exit!
+
+    test "successful request" do
+      Mox.expect(AnthropicMock, :post, fn _, _, _ ->
+        {:ok, %{body: %{"output" => "Hello, human!"}}}
+      end)
+
+      request = Anthropic.new() |> Anthropic.add_user_message("Hello, Anthropic!")
+      assert {:ok, response, _} = Anthropic.request_next_message(request)
+      assert response.content == "Hello, human!"
+    end
+  end
   ```
 
   ## Telemetry
@@ -27,24 +94,33 @@ defmodule Anthropic do
   ### Events
 
   - `[:anthropic, :request_next_message, :start]` - Emitted at the beginning of a request to the Anthropic API.
+    - Measurements: `%{system_time: integer()}`
+    - Metadata: `%{model: String.t(), max_tokens: integer()}`
+
   - `[:anthropic, :request_next_message, :stop]` - Emitted after a request to the Anthropic API successfully completes.
+    - Measurements: `%{duration: integer()}`
+    - Metadata: `%{model: String.t(), max_tokens: integer(), input_tokens: integer(), output_tokens: integer()}`
+
   - `[:anthropic, :request_next_message, :exception]` - Emitted if an exception occurs during a request to the Anthropic API.
+    - Measurements: `%{duration: integer()}`
+    - Metadata: `%{model: String.t(), max_tokens: integer(), kind: Exception.kind(), reason: term(), stacktrace: Exception.stacktrace()}`
 
   ### Metrics
 
-  Each telemetry event includes metadata with the following fields:
+  Each telemetry event includes metadata with the following information:
 
-  - `:model` - The model specified in the request.
-  - `:max_tokens` - The maximum number of tokens allowed in the response.
+  - `:model` - The name of the model used for the request.
+  - `:max_tokens` - The maximum number of tokens allowed in the generated response.
+  - `:input_tokens` - The number of tokens in the input message (only available in the `:stop` event).
+  - `:output_tokens` - The number of tokens in the generated response (only available in the `:stop` event).
+  - `:kind` - The type of exception that occurred (only available in the `:exception` event).
+  - `:reason` - The reason for the exception (only available in the `:exception` event).
+  - `:stacktrace` - The stacktrace of the exception (only available in the `:exception` event).
 
-  In addition, the `:stop` event includes metrics on:
-
-  - `:input_tokens` - The number of tokens in the request.
-  - `:output_tokens` - The number of tokens in the API response.
-
-  Errors are captured with their specific types, aiding in debugging and monitoring of the integration's health.
+  By attaching to these events, you can monitor the performance and health of your Anthropic API integration, track usage metrics, and handle exceptions as needed.
   """
 
+  alias Anthropic.Messages.Response
   alias Anthropic.Messages.Request
   alias Anthropic.Messages.Content.Image
   alias Anthropic.Config
@@ -204,6 +280,69 @@ defmodule Anthropic do
     add_message(request, :user, content)
   end
 
+  @spec register_tool(Anthropic.Messages.Request.t(), atom()) :: Anthropic.Messages.Request.t()
+  @doc """
+  Registers a tool module with the given request.
+
+  This function allows developers to register tools that implement the `Anthropic.Tools.ToolBehaviour`.
+  Registered tools can be utilized to dynamically handle function invocations from the assistant's responses.
+  It ensures that each tool module is only registered once per request.
+
+  The `Anthropic.Tools.ToolBehaviour` requires the following callbacks to be implemented:
+
+  - `description/0`: Returns a string describing the purpose and functionality of the tool.
+  - `parameters/0`: Returns a list of parameter specifications, each represented as a tuple `{name, type, description}`.
+    - `name`: An atom representing the name of the parameter.
+    - `type`: The type of the parameter, which can be `:string`, `:float`, or `:integer`.
+    - `description`: A string describing the parameter.
+  - `invoke/1`: Accepts a list of arguments as strings and returns the result of the tool invocation as a string.
+
+  By implementing these callbacks, developers can create custom tools that can be dynamically invoked by the assistant during the conversation.
+
+  ## Parameters
+
+  - `request`: The `Anthropic.Messages.Request` struct that represents the current state of the conversation.
+  - `tool_module`: The module that implements the `Anthropic.Tools.ToolBehaviour`, to be registered with the request.
+
+  ## Returns
+
+  - An updated `Anthropic.Messages.Request` struct with the tool module registered.
+
+  ## Examples
+
+  ```elixir
+  defmodule MyCustomTool do
+    use Anthropic.Tools.ToolBehaviour
+
+    def description, do: "A custom tool for demonstration purposes"
+
+    def parameters, do: [
+      {:name, :string, "The name of the person"},
+      {:age, :integer, "The age of the person"}
+    ]
+
+    def invoke([name, age]) do
+      "Hello, \#{name}! You are \#{age} years old."
+    end
+  end
+
+  request = Anthropic.register_tool(request, MyCustomTool)
+  ```
+  """
+  def register_tool(%Request{} = request, tool_module) when is_atom(tool_module) do
+    case {Code.ensure_loaded?(tool_module), Enum.member?(request.tools, tool_module)} do
+      {true, true} ->
+        request
+
+      {true, false} ->
+        %{request | tools: [tool_module | request.tools]}
+
+      {false, _} ->
+        raise ArgumentError,
+              "Module #{tool_module} is not loaded. Please use module full name (MyApp.AnthropicTool)"
+    end
+  end
+
   @spec request_next_message(Anthropic.Messages.Request.t()) :: any()
   @doc """
   Sends the current request to the Anthropic API and awaits the next message in the conversation.
@@ -238,7 +377,10 @@ defmodule Anthropic do
 
   # Prepares the response from the API for successful requests, updating the request with the assistant's message.
   defp prepare_response({:ok, response}, request) do
-    updated_request = add_assistant_message(request, response.content)
+    updated_request =
+      request
+      |> add_assistant_message(response.content)
+
     {:ok, response, updated_request}
   end
 
@@ -272,5 +414,71 @@ defmodule Anthropic do
 
   defp wrap_to_telemetry({:error, _response, _updated_request} = result) do
     {result, %{error: :unknown_error}}
+  end
+
+  @spec process_invocations(
+          {:ok, Anthropic.Messages.Response.t(), Anthropic.Messages.Request.t()}
+          | {:error, any(), Anthropic.Messages.Request.t()}
+        ) ::
+          {:ok, Anthropic.Messages.Response.t(), Anthropic.Messages.Request.t()}
+          | {:error, any(), Anthropic.Messages.Request.t()}
+  @doc """
+  Processes the tool invocations present in the assistant's response.
+
+  This function takes the result of `request_next_message/1` and checks if there are any tool invocations in the response. If invocations are found, it executes each one using the registered tools and appends the results to the conversation. It then sends the updated conversation back to the API for further processing.
+
+  ## Parameters
+  - `result`: The result of `request_next_message/1`, which can be either `{:ok, response, request}` or `{:error, response, request}`.
+
+  ## Returns
+  - `{:ok, response, updated_request}`: If the invocations are processed successfully, where `response` is the original response from the API, and `updated_request` is the request struct updated with the invocation results.
+  - `{:error, response, request}`: If an error occurs during the processing of invocations, where `response` contains the error details, and `request` is the original request struct.
+
+  ## Raises
+  - `ArgumentError`: If a tool invocation fails due to the specified tool not being registered or if there's an error during the execution of the tool.
+
+  This function is responsible for handling the dynamic execution of tools based on the assistant's responses. It allows for a more interactive and extensible conversation flow by processing tool invocations and incorporating their results into the ongoing conversation.
+  """
+  def process_invocations({:ok, %Response{} = response, %Request{} = request}) do
+    case cycle_invocations(response, request) do
+      {:ok, [], updated_request} ->
+        {:ok, response, updated_request}
+
+      {:ok, invocation_responses, updated_request} ->
+        invocation_responses
+        |> Enum.join("\n")
+        |> then(&add_user_message(updated_request, &1))
+        |> request_next_message()
+    end
+  end
+
+  def process_invocations({:error, _, _} = resp), do: resp
+
+  defp cycle_invocations(%Response{invocations: []}, %Request{} = request) do
+    {:ok, [], request}
+  end
+
+  defp cycle_invocations(%Response{invocations: invocations}, %Request{} = request) do
+    {responses, updated_request} =
+      Enum.map_reduce(invocations, request, fn {tool_name, args}, req ->
+        case process_invocation(tool_name, args, req) do
+          {:ok, result, updated_req} -> {result, updated_req}
+          {:error, reason} -> raise ArgumentError, "Invocation error: #{reason}"
+        end
+      end)
+
+    {:ok, responses, updated_request}
+  end
+
+  defp process_invocation(tool_name, args, %Request{} = request) do
+    case Enum.find(request.tools, &(&1 == tool_name)) do
+      nil ->
+        {:error, "Tool #{tool_name} not found"}
+
+      tool_module ->
+        task = Anthropic.Tools.Utils.execute_async(tool_module, args)
+        result = Anthropic.Tools.Utils.format_response(task, tool_name)
+        {:ok, result, request}
+    end
   end
 end

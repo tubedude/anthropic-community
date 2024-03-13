@@ -4,8 +4,19 @@ defmodule Anthropic.Messages.Response do
 
   This module defines the structure of a response from the Anthropic API and provides functionality to parse the raw response into a structured format. It deals with successful responses as well as various error conditions, translating HTTP responses into a consistent format for the caller to handle.
   """
+  alias Anthropic.Messages.Request
 
-  @fields [:id, :type, :role, :content, :model, :stop_reason, :stop_sequence, :usage]
+  @fields [
+    :id,
+    :type,
+    :role,
+    :content,
+    :model,
+    :stop_reason,
+    :stop_sequence,
+    :usage,
+    :invocations
+  ]
 
   defstruct @fields
 
@@ -17,10 +28,16 @@ defmodule Anthropic.Messages.Response do
           model: String.t(),
           stop_reason: String.t() | nil,
           stop_sequence: String.t() | nil,
-          usage: map()
+          usage: map(),
+          invocations: list(invocation()) | list()
         }
+  @type invocation :: {atom(), [String.t()]}
 
-  @spec parse({:error, any()} | {:ok, Finch.Response.t()}) :: {:error, any()} | {:ok, t()}
+  @spec parse(
+          {:error, Anthropic.Messages.Request.t()} | {:ok, Finch.Response.t()},
+          Anthropic.Messages.Request.t()
+        ) ::
+          {:error, any()} | {:ok, struct()}
   @doc """
   Parses an HTTP response from the Anthropic API.
 
@@ -36,7 +53,7 @@ defmodule Anthropic.Messages.Response do
   - For client errors (status codes 400-499) and server errors (status codes 500-599), returns `{:error, response}` where `response` is the original response indicating an error.
   - For errors during the request process, returns `{:error, response}` where `response` is the original error response.
   """
-  def parse({:ok, %Finch.Response{status: 200} = response}) do
+  def parse({:ok, %Finch.Response{status: 200} = response}, request) do
     case Jason.decode(response.body) do
       {:error, _} = error ->
         error
@@ -44,14 +61,17 @@ defmodule Anthropic.Messages.Response do
       {:ok, body} ->
         @fields
         |> Enum.map(fn field -> {field, body[Atom.to_string(field)]} end)
-        |> then(fn list -> {:ok, struct(%__MODULE__{}, list)} end)
+        |> then(fn list -> struct(%__MODULE__{}, list) end)
+        |> parse_for_invocations(request)
+        |> then(fn response -> {:ok, response} end)
     end
   end
 
-  def parse({:ok, %Finch.Response{status: status} = response}) when status in 500..599,
+  def parse({:ok, %Finch.Response{status: status} = response}, _request) when status in 500..599,
     do: {:error, response}
 
-  def parse({:ok, %Finch.Response{status: status} = response}) when status in 400..499 do
+  def parse({:ok, %Finch.Response{status: status} = response}, _request)
+      when status in 400..499 do
     res =
       case Jason.decode(response.body) do
         {:error, _} ->
@@ -64,6 +84,19 @@ defmodule Anthropic.Messages.Response do
     {:error, res}
   end
 
-  def parse({:error, response}),
+  def parse({:error, response}, _request),
     do: {:error, response}
+
+  defp parse_for_invocations(response, %Request{tools: []}), do: response
+
+  defp parse_for_invocations(%{content: content} = response, _request) do
+    case Enum.at(content, 0) do
+      %{"type" => "text", "text" => text_content} ->
+        invocations = Anthropic.Tools.Utils.parse_invoke_function(text_content)
+        %{response | invocations: invocations}
+
+      _ ->
+        response
+    end
+  end
 end
