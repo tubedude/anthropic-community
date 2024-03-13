@@ -1,5 +1,8 @@
 ## 0.4.1 - 2024-03-13
 
+### Breaking change
+- Changed the tool field type to MapSet
+
 ### Improved
 - Better system function concatenation with tools description
 - Moved List.reverse from messages to Jason.Encoder implementation.

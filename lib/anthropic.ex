@@ -319,17 +319,27 @@ defmodule Anthropic do
   """
   @doc since: "0.4.0"
   def register_tool(%Request{} = request, tool_module) when is_atom(tool_module) do
-    case {Code.ensure_loaded?(tool_module), Enum.member?(request.tools, tool_module)} do
-      {true, true} ->
-        request
-
-      {true, false} ->
-        %{request | tools: [tool_module | request.tools]}
-
-      {false, _} ->
-        raise ArgumentError,
-              "Module #{tool_module} is not loaded. Please use module full name (MyApp.AnthropicTool)"
+    if Code.ensure_loaded?(tool_module) do
+      %{request | tools: MapSet.put(request.tools, tool_module)}
+    else
+      raise ArgumentError,
+      "Module #{tool_module} is not loaded. Please use module full name (MyApp.AnthropicTool)"
     end
+    # case {Code.ensure_loaded?(tool_module), Enum.member?(request.tools, tool_module)} do
+    #   {true, true} ->
+    #     request
+
+    #   {true, false} ->
+    #     %{request | tools: [tool_module | request.tools]}
+
+    #   {false, _} ->
+    #     raise ArgumentError,
+    #           "Module #{tool_module} is not loaded. Please use module full name (MyApp.AnthropicTool)"
+    # end
+  end
+
+  def remove_tool(%Request{} = request, tool_module) do
+    %{request | tools: MapSet.delete(request.tools, tool_module)}
   end
 
   @spec request_next_message(Anthropic.Messages.Request.t(), any()) :: any()

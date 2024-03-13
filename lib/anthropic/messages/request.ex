@@ -36,7 +36,7 @@ defmodule Anthropic.Messages.Request do
             temperature: nil,
             top_p: nil,
             top_k: nil,
-            tools: []
+            tools: MapSet.new()
 
   @type t :: %__MODULE__{
           model: String.t() | nil,
@@ -49,7 +49,7 @@ defmodule Anthropic.Messages.Request do
           temperature: float() | nil,
           top_p: float() | nil,
           top_k: integer() | nil,
-          tools: list(atom()) | list()
+          tools: MapSet.t(atom())
         }
 
   @type message() :: %{

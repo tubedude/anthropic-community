@@ -184,12 +184,7 @@ defmodule AnthropicTest do
     end
 
     test "successfully registers a tool module", %{request: request} do
-      assert %Request{tools: [MockTool]} = Anthropic.register_tool(request, MockTool)
-    end
-
-    test "does not duplicate tool registration", %{request: request} do
-      request = Anthropic.register_tool(request, MockTool)
-      assert %Request{tools: [MockTool]} = Anthropic.register_tool(request, MockTool)
+      assert Anthropic.register_tool(request, MockTool) |> then(&(&1.tools)) |> MapSet.member?(MockTool)
     end
 
     test "raises an error for unregistered modules", %{request: request} do
@@ -198,6 +193,21 @@ defmodule AnthropicTest do
                    fn ->
                      Anthropic.register_tool(request, UnloadedMockTool)
                    end
+    end
+  end
+
+  describe "remove_tool/2" do
+    setup do
+      request = Anthropic.new()
+      {:ok, request: request}
+    end
+
+    test "successfully removes a tool module", %{request: request} do
+      request =
+        Anthropic.register_tool(request, MockTool)
+
+      assert MapSet.member?(request.tools, MockTool)
+      assert !(Anthropic.remove_tool(request, MockTool) |> then(&(&1.tools)) |> MapSet.member?(MockTool))
     end
   end
 end
