@@ -1,10 +1,16 @@
 ## 0.4.0 - 2024-03-13
 
 ### Improved
-- Added tools handling
+- Added tools handling. Now you can register tools that the AI can call, and these calls are automaticaly captured.
+
+### Fixed
+- The way Messages.content was being generated
 
 ### Minor
 - Moved Response parsing to Request module.
+
+### Breaking change
+- Replaced `Anthropic.add_image/2` with `Anthropic.add_user_image/2`
 
 ## 0.3.0 - 2024-03-12
 

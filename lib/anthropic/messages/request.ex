@@ -3,6 +3,15 @@ defmodule Anthropic.Messages.Request do
   Defines the structure and functionality for creating and sending requests to the Anthropic API.
 
   This module is responsible for encapsulating the data needed for a request, including model specifications, messages, and various control parameters. It also implements the `Jason.Encoder` protocol to ensure that instances of this struct can be serialized to JSON format, which is required for API requests.
+
+  The following configuration options are available:
+
+  - `:model` - The name of the model to use for generating responses (default: "claude-3-opus-20240229").
+  - `:max_tokens` - The maximum number of tokens allowed in the generated response (default: 1000).
+  - `:temperature` - The sampling temperature for controlling response randomness (default: 1.0).
+  - `:top_p` - The cumulative probability threshold for nucleus sampling (default: 1.0).
+  - `:top_k` - The number of most probable next words considered at each step in sampling for text generation. (default: nil).
+
   """
 
   @endpoint "/messages"
@@ -48,7 +57,12 @@ defmodule Anthropic.Messages.Request do
           role: String.t()
         }
 
-  @type content_object :: %{type: String.t(), text: String.t()} | %{type: String.t(), source: %{data: String.t(), type: String.t(), media_type: String.t()}}
+  @type content_object ::
+          %{type: String.t(), text: String.t()}
+          | %{
+              type: String.t(),
+              source: %{data: String.t(), type: String.t(), media_type: String.t()}
+            }
 
   defimpl Jason.Encoder, for: Anthropic.Messages.Request do
     def encode(req, opts) do
@@ -136,12 +150,14 @@ defmodule Anthropic.Messages.Request do
   defp build_finch_request(body, opts) do
     sys_opts = Config.opts()
 
-    req = Finch.build(
-      :post,
-      Utils.build_path(@endpoint, sys_opts.api_url),
-      Utils.build_header(sys_opts),
-      body
-    )
+    req =
+      Finch.build(
+        :post,
+        Utils.build_path(@endpoint, sys_opts.api_url),
+        Utils.build_header(sys_opts),
+        body
+      )
+
     Logger.debug(inspect(req))
     Finch.request(req, HTTPClient, opts)
   end

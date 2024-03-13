@@ -3,10 +3,10 @@ This unofficial Elixir wrapper provides a convenient way to interact with the [A
 
 ## Features
 - Easy setup and configuration.
+- Support for registering and invoking tools.
 - Support for sending messages and receiving responses from the Claude LLM model.
 - Error handling for both client and server-side issues.
 - Customizable request parameters to tweak the behavior of the API.
-- Support for registering and invoking tools.
 
 ## To-dos
 - Add streaming handling
@@ -17,7 +17,7 @@ The package can be installed by adding `anthropic` to your list of dependencies 
 ```elixir
 def deps do
   [
-    {:anthropic, "~> 0.4.0"}
+    {:anthropic, "~> 0.4.0", hex: :anthropic_community}
   ]
 end
 ```
@@ -76,7 +76,7 @@ You can register tools that the AI can use to perform specific tasks. Here's an 
 
 ```elixir
 defmodule MyApp.WeatherTool do
-  use Anthropic.Tool.ToolBehaviour
+  @behaviour Anthropic.Tool.ToolBehaviour
 
 
   @impl true
@@ -94,9 +94,10 @@ defmodule MyApp.WeatherTool do
   end
 
   @impl true
-  def invoke([location]) do
+  def invoke(location: location) do
     # Implement the tool's functionality here
     # ...
+    # and return a string
   end
 end
 
