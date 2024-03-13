@@ -69,7 +69,7 @@ defmodule Anthropic.Messages.Request do
       %{
         messages: req.messages,
         model: req.model,
-        system: add_tools_descriptions(req.system, req.tools),
+        system: Anthropic.Tools.Utils.decorate_tools_description(req.system, req.tools),
         max_tokens: req.max_tokens,
         metadata: req.metadata,
         stop_sequences: req.stop_sequences,
@@ -80,17 +80,6 @@ defmodule Anthropic.Messages.Request do
       }
       |> Map.reject(fn {_key, value} -> is_nil(value) end)
       |> Jason.Encode.map(opts)
-    end
-
-    defp add_tools_descriptions(system, tools) do
-      descriptions =
-        tools
-        |> Enum.map(fn tool ->
-          Anthropic.Tools.Utils.generate_tool_description(tool)
-        end)
-
-      Enum.concat([[system], [Anthropic.Tools.Utils.separator()], descriptions, ["</tools>"]])
-      |> Enum.join("\n")
     end
   end
 

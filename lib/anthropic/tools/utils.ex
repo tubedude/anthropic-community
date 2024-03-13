@@ -1,7 +1,36 @@
 defmodule Anthropic.Tools.Utils do
   @moduledoc false
 
-  def generate_tool_description(tool_module) when is_atom(tool_module) do
+  @spec decorate_tools_description(binary(), list(atom())) :: <<_::64, _::_*8>>
+  def decorate_tools_description(system, tools) do
+    tools_description =
+      tools
+      |> Enum.map(&generate_tool_description/1)
+      |> Enum.join("\n")
+
+    """
+    #{system}
+
+    In this environment you have access to a set of tools you can use to answer the user's question.
+    You may call them like this:
+    <function_calls>
+      <invoke>
+        <tool_name>$TOOL_NAME</tool_name>
+        <parameters>
+          <$PARAMETER_NAME>$PARAMETER_VALUE</$PARAMETER_NAME>
+          ...
+        </parameters>
+      </invoke>
+    </function_calls>
+    When you feel the need to call functions, only send the proper XML. Do not write anything else and wait for my reply.
+    Here are the tools available:
+    <tools>
+    #{tools_description}
+    </tools>
+    """
+  end
+
+  defp generate_tool_description(tool_module) when is_atom(tool_module) do
     description = tool_module.description()
     parameters = tool_module.parameters()
 
@@ -65,15 +94,15 @@ defmodule Anthropic.Tools.Utils do
       Enum.zip(tool_names, Task.await_many(tasks))
       |> Enum.map(fn {tool_name, result} -> {tool_name, result} end)
 
-    build_xml(results)
+    build_result_xml(results)
   end
 
   def format_response(task, tool_name) do
     result = Task.await(task)
-    build_xml([{tool_name, result}])
+    build_result_xml([{tool_name, result}])
   end
 
-  defp build_xml(results) do
+  defp build_result_xml(results) do
     """
     <function_results>
     #{Enum.map(results, fn {tool_name, result} -> """
@@ -84,26 +113,6 @@ defmodule Anthropic.Tools.Utils do
         </stdout>
       </result>
       """ end) |> Enum.join()}</function_results>
-    """
-  end
-
-  def separator do
-    """
-    In this environment you have access to a set of tools you can use to answer the user's question.
-
-    You may call them like this:
-    <function_calls>
-    <invoke>
-    <tool_name>$TOOL_NAME</tool_name>
-    <parameters>
-    <$PARAMETER_NAME>$PARAMETER_VALUE</$PARAMETER_NAME>
-    ...
-    </parameters>
-    </invoke>
-    </function_calls>
-
-    Here are the tools available:
-    <tools>
     """
   end
 end

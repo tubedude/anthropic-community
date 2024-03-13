@@ -103,7 +103,7 @@ end
 
 {:ok, response, request} =
   Anthropic.new()
-  |> Anthropic.register_tool(MyTool)
+  |> Anthropic.register_tool(MyApp.WeatherTool)
   |> Anthropic.add_user_message("Use the MyApp.WeatherTool to perform a task.")
   |> Anthropic.request_next_message()
   |> Anthropic.process_invocations()

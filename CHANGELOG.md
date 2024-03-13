@@ -1,3 +1,8 @@
+## 0.4.1 - 2024-03-13
+
+### Improved
+- Better system function concatenation with tools description
+
 ## 0.4.0 - 2024-03-13
 
 ### Improved
