@@ -7,6 +7,8 @@ defmodule Anthropic.Messages.Request do
 
   @endpoint "/messages"
 
+  require Logger
+
   alias Anthropic.{Config, HTTPClient}
   alias Anthropic.HttpClient.Utils
 
@@ -42,9 +44,11 @@ defmodule Anthropic.Messages.Request do
         }
 
   @type message() :: %{
-          content: String.t(),
+          content: content_object(),
           role: String.t()
         }
+
+  @type content_object :: %{type: String.t(), text: String.t()} | %{type: String.t(), source: %{data: String.t(), type: String.t(), media_type: String.t()}}
 
   defimpl Jason.Encoder, for: Anthropic.Messages.Request do
     def encode(req, opts) do
@@ -132,12 +136,13 @@ defmodule Anthropic.Messages.Request do
   defp build_finch_request(body, opts) do
     sys_opts = Config.opts()
 
-    Finch.build(
+    req = Finch.build(
       :post,
       Utils.build_path(@endpoint, sys_opts.api_url),
       Utils.build_header(sys_opts),
       body
     )
-    |> Finch.request(HTTPClient, opts)
+    Logger.debug(inspect(req))
+    Finch.request(req, HTTPClient, opts)
   end
 end

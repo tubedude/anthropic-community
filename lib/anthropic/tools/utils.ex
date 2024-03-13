@@ -32,25 +32,19 @@ defmodule Anthropic.Tools.Utils do
     |> Enum.join()
   end
 
-  # @spec parse_invoke_function(binary()) :: list(binary())
+  @spec parse_invoke_function(binary()) :: list(binary())
   def parse_invoke_function(xml_string) do
-    invoke_blocks_pattern = ~r/<invoke>(.*?)<\/invoke>/s
-    tool_name_pattern = ~r/<tool_name>(.*?)<\/tool_name>/
-    params_pattern = ~r/<param\d+>(.*?)<\/param\d+>/
+    ~r/<invoke>.*?<tool_name>(.*?)<\/tool_name>.*?<parameters>(.*?)<\/parameters>.*?<\/invoke>/s
+    |> Regex.scan(xml_string, capture: :all_but_first)
+    |> Enum.map(fn [tool_name, parameters] ->
+      {safe_convert_to_atom(tool_name), parse_parameters(parameters)}
+    end)
+  end
 
-    Regex.scan(invoke_blocks_pattern, xml_string)
-    |> Enum.map(fn [_, invoke_block] ->
-      tool_name =
-        Regex.scan(tool_name_pattern, invoke_block)
-        |> List.first()
-        |> then(fn [_, name] -> name end)
-        |> safe_convert_to_atom()
-
-      params =
-        Regex.scan(params_pattern, invoke_block)
-        |> Enum.map(fn [_, param] -> param end)
-
-      {tool_name, params}
+  defp parse_parameters(parameters_string) do
+    Regex.scan(~r/<(\w+)>(.*?)<\/\1>/, parameters_string, capture: :all_but_first)
+    |> Enum.map(fn [param_name, param_value] ->
+      {safe_convert_to_atom(param_name), param_value}
     end)
   end
 
@@ -63,17 +57,22 @@ defmodule Anthropic.Tools.Utils do
   defp safe_convert_to_atom(_), do: nil
 
   def execute_async(module, args) when is_atom(module) and is_list(args) do
+    dbg(args)
     Task.async(fn ->
       apply(module, :invoke, args)
     end)
   end
 
-  def format_response(tasks, tool_names) do
+  def format_response(tasks, tool_names) when is_list(tasks) do
     results =
       Enum.zip(tool_names, Task.await_many(tasks))
       |> Enum.map(fn {tool_name, result} -> {tool_name, result} end)
-
     build_xml(results)
+  end
+
+  def format_response(task, tool_name) do
+    result = Task.await(task)
+    build_xml([{tool_name, result}])
   end
 
   defp build_xml(results) do
@@ -92,6 +91,19 @@ defmodule Anthropic.Tools.Utils do
 
   def separator do
     """
+    In this environment you have access to a set of tools you can use to answer the user's question.
+
+    You may call them like this:
+    <function_calls>
+    <invoke>
+    <tool_name>$TOOL_NAME</tool_name>
+    <parameters>
+    <$PARAMETER_NAME>$PARAMETER_VALUE</$PARAMETER_NAME>
+    ...
+    </parameters>
+    </invoke>
+    </function_calls>
+
     Here are the tools available:
     <tools>
     """

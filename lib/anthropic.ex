@@ -176,7 +176,8 @@ defmodule Anthropic do
         "System message must be type String, got #{inspect(message, limit: 50, structs: false, width: 80)}"
       )
 
-  @spec add_message(Anthropic.Messages.Request.t(), role(), any()) :: any()
+
+  @spec add_message(Anthropic.Messages.Request.t(), role(), String.t() | [String.t()] | Request.content_object() | [Request.content_object()]) :: Anthropic.Messages.Request.t()
   @doc """
   Adds a message to the request with a specified role.
 
@@ -184,28 +185,58 @@ defmodule Anthropic do
 
   - `request`: The `Anthropic.Messages.Request` struct to which the message will be added.
   - `role`: The role of the message (e.g., `:user` or `:assistant`).
-  - `message`: The content of the message, can be a binary string, or a list of binary strings that will be treated as different messages.
+  - `message`: The content of the message, which can be one of the following:
+    - A binary string representing a single text message.
+    - A list of binary strings representing multiple text messages.
+    - A content object representing a single message with a specific type (e.g., text or image).
+    - A list of content objects representing multiple messages with specific types.
 
   ## Returns
 
-  - The updated `Anthropic.Messages.Request` struct with the new message added.
-  """
-  def add_message(%Request{} = request, role, messages) when is_list(messages) do
-    messages
-    |> Enum.reduce(request, fn elem, acc -> add_message(acc, role, elem) end)
-  end
+  - The updated `Anthropic.Messages.Request` struct with the new message(s) added.
 
-  def add_message(%Request{messages: messages} = request, role, message) do
-    messages =
+  ## Examples
+
+  ```elixir
+  # Adding a single text message
+  request = Anthropic.add_message(request, :user, "Hello!")
+
+  # Adding multiple text messages
+  request = Anthropic.add_message(request, :user, ["Hello!", "How are you?"])
+
+  # Adding a single content object
+  content_object = %{type: "text", text: "Hello!"}
+  request = Anthropic.add_message(request, :user, content_object)
+
+  # Adding multiple content objects
+  content_objects = [
+    %{type: "text", text: "Hello!"},
+    %{type: "image", source: %{data: "base64_encoded_data", type: "base64", media_type: "image/png"}}
+  ]
+  request = Anthropic.add_message(request, :user, content_objects)
+  """
+  def add_message(%Request{messages: messages} = request, role, content) when is_list(content) do
+    content_objects =
+      content
+      |> Enum.map(fn
+        message when is_binary(message) -> %{type: "text", text: message}
+        content_object -> content_object
+      end)
+
+    updated_messages =
       messages
       |> Enum.reverse()
-      |> then(fn list -> [%{role: role, content: message} | list] end)
+      |> then(fn list -> [%{role: role, content: content_objects} | list] end)
       |> Enum.reverse()
 
-    %{request | messages: messages}
+    %{request | messages: updated_messages}
   end
 
-  @spec add_user_message(Anthropic.Messages.Request.t(), binary()) ::
+  def add_message(%Request{} = request, role, content_object) do
+    add_message(request, role, [content_object])
+  end
+
+  @spec add_user_message(Anthropic.Messages.Request.t(), binary() | Request.content_object()) ::
           Anthropic.Messages.Request.t()
   @doc """
   Adds a user message to the request.
@@ -219,7 +250,7 @@ defmodule Anthropic do
 
   - The updated `Anthropic.Messages.Request` struct with the user message added.
   """
-  def add_user_message(%Request{} = request, message) when is_binary(message) do
+  def add_user_message(%Request{} = request, message) do
     add_message(%Request{} = request, :user, message)
   end
 
@@ -476,7 +507,7 @@ defmodule Anthropic do
         {:error, "Tool #{tool_name} not found"}
 
       tool_module ->
-        task = Anthropic.Tools.Utils.execute_async(tool_module, args)
+        task = Anthropic.Tools.Utils.execute_async(tool_module, [args])
         result = Anthropic.Tools.Utils.format_response(task, tool_name)
         {:ok, result, request}
     end

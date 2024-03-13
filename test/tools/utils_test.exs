@@ -7,18 +7,22 @@ defmodule Tools.UtilsTest do
       xml_string = """
       <invoke>
         <tool_name>Elixir.AnthropicTest.MockTool</tool_name>
-        <param1>value1</param1>
-        <param2>42</param2>
+        <parameters>
+          <param1>value1</param1>
+          <param2>42</param2>
+        </parameters>
       </invoke>
       <invoke>
         <tool_name>Elixir.AnthropicTest.AnotherMockTool</tool_name>
-        <param1>value2</param1>
+        <parameters>
+          <name>value2</name>
+        </parameters>
       </invoke>
       """
 
       expected_invocations = [
-        {AnthropicTest.MockTool, ["value1", "42"]},
-        {AnthropicTest.AnotherMockTool, ["value2"]}
+        {AnthropicTest.MockTool, [param1: "value1", param2: "42"]},
+        {AnthropicTest.AnotherMockTool, [name: "value2"]}
       ]
 
       actual_invocations = Utils.parse_invoke_function(xml_string)

@@ -44,10 +44,10 @@ defmodule AnthropicTest do
         |> Anthropic.add_user_message("Message 2")
         |> Anthropic.add_user_message("Message 3")
 
-      assert List.first(request.messages).content == "Message 1"
+      assert List.first(request.messages).content == [%{type: "text", text: "Message 1"}]
       assert List.first(request.messages).role == :user
 
-      assert List.last(request.messages).content == "Message 3"
+      assert List.last(request.messages).content == [%{type: "text", text: "Message 3"}]
       assert List.last(request.messages).role == :user
     end
   end
@@ -59,7 +59,7 @@ defmodule AnthropicTest do
         |> Anthropic.add_user_message("Message 1")
         |> Anthropic.add_assistant_message("And the reply is...")
 
-      assert List.last(request.messages).content == "And the reply is..."
+      assert List.last(request.messages).content == [%{type: "text", text: "And the reply is..."}]
       assert List.last(request.messages).role == :assistant
     end
   end
@@ -72,8 +72,8 @@ defmodule AnthropicTest do
         |> Anthropic.add_message(:assistant, "Hi there!")
 
       assert [
-               %{role: :user, content: "Hello"},
-               %{role: :assistant, content: "Hi there!"}
+               %{role: :user, content: [ %{type: "text", text: "Hello"}]},
+               %{role: :assistant, content: [%{type: "text", text: "Hi there!"}]}
              ] = request.messages
     end
 
@@ -83,8 +83,7 @@ defmodule AnthropicTest do
         |> Anthropic.add_message(:user, ["Message 1", "Message 2"])
 
       assert [
-               %{role: :user, content: "Message 1"},
-               %{role: :user, content: "Message 2"}
+               %{role: :user, content: [%{text: "Message 1", type: "text"},%{text: "Message 2", type: "text"} ]},
              ] = request.messages
     end
   end
@@ -140,10 +139,10 @@ defmodule AnthropicTest do
 
       assert %{
                role: :user,
-               content: %{
+               content: [%{
                  type: "image",
                  source: %{data: _data, type: "base64", media_type: "image/png"}
-               }
+               }]
              } = elem
     end
   end
