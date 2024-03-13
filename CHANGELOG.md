@@ -1,4 +1,7 @@
-## 0.#.# 
+## 0.4.0 - 2024-03-13
+
+### Improved
+- Added tools handling
 
 ### Minor
 - Moved Response parsing to Request module.

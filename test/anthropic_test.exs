@@ -4,16 +4,19 @@ defmodule AnthropicTest do
 
   alias Anthropic.Messages.Request
   alias Anthropic.Config
+  alias AnthropicTest.MockTool
 
-  test "new/1 returns a Anthropic.Message.Request" do
-    assert %Request{} = Anthropic.new()
-  end
+  describe "new/1" do
+    test "returns a Anthropic.Message.Request" do
+      assert %Request{} = Anthropic.new()
+    end
 
-  test "can override a config on runtime without altering GenServer" do
-    assert %Request{temperature: 0.5} = Anthropic.new(temperature: 0.5)
-    assert %Request{max_tokens: 100} = Anthropic.new(max_tokens: 100)
-    assert %Config{temperature: 1.0} = Anthropic.Config.opts()
-    assert %Config{max_tokens: 1000} = Anthropic.Config.opts()
+    test "can override a config on runtime without altering GenServer" do
+      assert %Request{temperature: 0.5} = Anthropic.new(temperature: 0.5)
+      assert %Request{max_tokens: 100} = Anthropic.new(max_tokens: 100)
+      assert %Config{temperature: 1.0} = Anthropic.Config.opts()
+      assert %Config{max_tokens: 1000} = Anthropic.Config.opts()
+    end
   end
 
   describe "add_system_message/2" do
@@ -61,6 +64,72 @@ defmodule AnthropicTest do
     end
   end
 
+  describe "add_message/3" do
+    test "appends a single message with the specified role" do
+      request =
+        Anthropic.new()
+        |> Anthropic.add_message(:user, "Hello")
+        |> Anthropic.add_message(:assistant, "Hi there!")
+
+      assert [
+               %{role: :user, content: "Hello"},
+               %{role: :assistant, content: "Hi there!"}
+             ] = request.messages
+    end
+
+    test "appends multiple messages with the specified role" do
+      request =
+        Anthropic.new()
+        |> Anthropic.add_message(:user, ["Message 1", "Message 2"])
+
+      assert [
+               %{role: :user, content: "Message 1"},
+               %{role: :user, content: "Message 2"}
+             ] = request.messages
+    end
+  end
+
+  describe "process_invocations/1" do
+    test "returns the response and updated request when there are no invocations" do
+      response = %Anthropic.Messages.Response{content: "Hello!", invocations: []}
+      request = Anthropic.new()
+
+      assert {:ok, response, request} == Anthropic.process_invocations({:ok, response, request})
+    end
+
+    # TODO implement Mox
+    @tag :skip
+    test "processes invocations and updates the request" do
+      response = %Anthropic.Messages.Response{
+        content: "Here are the results:",
+        invocations: [{MockTool, ["value1"]}]
+      }
+
+      request =
+        Anthropic.new()
+        |> Anthropic.register_tool(MockTool)
+
+      {:ok, updated_response, updated_request} =
+        Anthropic.process_invocations({:ok, response, request})
+
+      assert updated_response.content =~ "MockTool result"
+      assert updated_request.messages == [%{role: :user, content: "MockTool result"}]
+    end
+
+    test "returns an error when a tool is not found" do
+      response = %Anthropic.Messages.Response{
+        content: "Invoking a missing tool:",
+        invocations: [{"MissingTool", %{}}]
+      }
+
+      request = Anthropic.new()
+
+      assert_raise ArgumentError, "Invocation error: Tool MissingTool not found", fn ->
+        Anthropic.process_invocations({:ok, response, request})
+      end
+    end
+  end
+
   describe "add_image/2" do
     test "from valid path" do
       elem =
@@ -88,6 +157,30 @@ defmodule AnthropicTest do
         |> Anthropic.add_user_message("Good morning")
         |> Anthropic.request_next_message()
       end)
+    end
+  end
+
+  describe "register_tool/2" do
+    setup do
+      request = Anthropic.new()
+      {:ok, request: request}
+    end
+
+    test "successfully registers a tool module", %{request: request} do
+      assert %Request{tools: [MockTool]} = Anthropic.register_tool(request, MockTool)
+    end
+
+    test "does not duplicate tool registration", %{request: request} do
+      request = Anthropic.register_tool(request, MockTool)
+      assert %Request{tools: [MockTool]} = Anthropic.register_tool(request, MockTool)
+    end
+
+    test "raises an error for unregistered modules", %{request: request} do
+      assert_raise ArgumentError,
+                   "Module Elixir.UnloadedMockTool is not loaded. Please use module full name (MyApp.AnthropicTool)",
+                   fn ->
+                     Anthropic.register_tool(request, UnloadedMockTool)
+                   end
     end
   end
 end

@@ -1,28 +1,23 @@
 # Anthropic Elixir API Wrapper
-
 This unofficial Elixir wrapper provides a convenient way to interact with the [Anthropic API](https://docs.anthropic.com/claude/reference/getting-started-with-the-api), specifically designed to work with the [Claude LLM model](https://docs.anthropic.com/claude/docs/intro-to-claude). It includes modules for handling configuration, preparing requests, sending them to the API, and processing responses.
 
 ## Features
-
 - Easy setup and configuration.
 - Support for sending messages and receiving responses from the Claude LLM model.
 - Error handling for both client and server-side issues.
 - Customizable request parameters to tweak the behavior of the API.
+- Support for registering and invoking tools.
 
-## To dos:
-
-- Add Streaming handling
-- Add tool description
+## To-dos
+- Add streaming handling
 
 ## Installation
-
-The package can be installed
-by adding `anthropic` to your list of dependencies in `mix.exs`:
+The package can be installed by adding `anthropic` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:anthropic, "~> 0.1.0"}
+    {:anthropic, "~> 0.4.0"}
   ]
 end
 ```
@@ -30,7 +25,7 @@ end
 ## Configuration
 Add or create a config file to provide the `api_key` as in the example below.
 
-```
+```elixir
 # config/config.exs
 import Config
 
@@ -39,17 +34,18 @@ config :anthropic,
 ```
 
 ## Usage
-
-```
+### Basic Conversation
+```elixir
 {:ok, response, request} =
   Anthropic.new()
   |> Anthropic.add_system_message("You are a helpful assistant")
-  |> Anthropic.add_user_message("Explain me monads in computer science. Be concise.")
+  |> Anthropic.add_user_message("Explain monads in computer science. Be concise.")
   |> Anthropic.request_next_message()
 ```
 
-Response will hold a map with the API response.
-```
+The `response` will hold a map with the API response.
+
+```elixir
 %{
   id: "msg_013Zva2CMHLNnXjNJJKqJ2EF",
   content: [
@@ -60,19 +56,54 @@ Response will hold a map with the API response.
   stop_reason: "end_turn",
   stop_sequence: null,
   type: "message",
-  usage": {
-    "input_tokens": 10,
-    "output_tokens": 25
+  usage: %{
+    "input_tokens" => 10,
+    "output_tokens" => 25
   }
 }
 ```
-But the conversation can continue:
 
-```
+The conversation can continue:
+
+```elixir
 request
 |> Anthropic.add_user_message("Hold on right there! ELI5!")
 |> Anthropic.request_next_message()
-
 ```
 
+### Registering and Invoking Tools
+You can register tools that the AI can use to perform specific tasks. Here's an example:
 
+```elixir
+defmodule MyApp.WeatherTool do
+  use Anthropic.Tool.ToolBehaviour
+
+
+  @impl true
+  def description do
+    """
+    Tool description to explain AI how and when to use it
+    """
+  end
+
+  @impl true
+  def parameters do
+    [
+      {:location, :string, "The city and state of the location you need the weather"}
+    ]
+  end
+
+  @impl true
+  def invoke([location]) do
+    # Implement the tool's functionality here
+    # ...
+  end
+end
+
+{:ok, response, request} =
+  Anthropic.new()
+  |> Anthropic.register_tool(MyTool)
+  |> Anthropic.add_user_message("Use the MyApp.WeatherTool to perform a task.")
+  |> Anthropic.request_next_message()
+  |> Anthropic.process_invocations()
+```
