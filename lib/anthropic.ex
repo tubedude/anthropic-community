@@ -173,9 +173,7 @@ defmodule Anthropic do
 
     updated_messages =
       messages
-      |> Enum.reverse()
-      |> then(fn list -> [%{role: role, content: content_objects} | list] end)
-      |> Enum.reverse()
+      |> List.insert_at(0, %{role: role, content: content_objects})
 
     %{request | messages: updated_messages}
   end

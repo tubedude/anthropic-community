@@ -10,6 +10,7 @@ This unofficial Elixir wrapper provides a convenient way to interact with the [A
 
 ## To-dos
 - Add streaming handling
+- Allow for Tool do define different models.
 
 ## Installation
 The package can be installed by adding `anthropic` to your list of dependencies in `mix.exs`:

@@ -44,10 +44,10 @@ defmodule AnthropicTest do
         |> Anthropic.add_user_message("Message 2")
         |> Anthropic.add_user_message("Message 3")
 
-      assert List.first(request.messages).content == [%{type: "text", text: "Message 1"}]
+      assert List.first(request.messages).content == [%{type: "text", text: "Message 3"}]
       assert List.first(request.messages).role == :user
 
-      assert List.last(request.messages).content == [%{type: "text", text: "Message 3"}]
+      assert List.last(request.messages).content == [%{type: "text", text: "Message 1"}]
       assert List.last(request.messages).role == :user
     end
 
@@ -72,8 +72,8 @@ defmodule AnthropicTest do
         |> Anthropic.add_user_message("Message 1")
         |> Anthropic.add_assistant_message("And the reply is...")
 
-      assert List.last(request.messages).content == [%{type: "text", text: "And the reply is..."}]
-      assert List.last(request.messages).role == :assistant
+      assert List.first(request.messages).content == [%{type: "text", text: "And the reply is..."}]
+      assert List.first(request.messages).role == :assistant
     end
   end
 
@@ -85,8 +85,8 @@ defmodule AnthropicTest do
         |> Anthropic.add_message(:assistant, "Hi there!")
 
       assert [
-               %{role: :user, content: [%{type: "text", text: "Hello"}]},
-               %{role: :assistant, content: [%{type: "text", text: "Hi there!"}]}
+        %{role: :assistant, content: [%{type: "text", text: "Hi there!"}]},
+               %{role: :user, content: [%{type: "text", text: "Hello"}]}
              ] = request.messages
     end
 

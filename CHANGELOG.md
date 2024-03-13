@@ -2,6 +2,7 @@
 
 ### Improved
 - Better system function concatenation with tools description
+- Moved List.reverse from messages to Jason.Encoder implementation.
 
 ## 0.4.0 - 2024-03-13
 

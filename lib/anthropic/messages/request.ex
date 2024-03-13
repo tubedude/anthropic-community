@@ -67,7 +67,7 @@ defmodule Anthropic.Messages.Request do
   defimpl Jason.Encoder, for: Anthropic.Messages.Request do
     def encode(req, opts) do
       %{
-        messages: req.messages,
+        messages: Enum.reverse(req.messages),
         model: req.model,
         system: Anthropic.Tools.Utils.decorate_tools_description(req.system, req.tools),
         max_tokens: req.max_tokens,
