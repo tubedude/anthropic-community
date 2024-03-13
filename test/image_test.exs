@@ -1,4 +1,4 @@
-defmodule ImageTest do
+defmodule Anthropic.ImageTest do
   use ExUnit.Case
   doctest Anthropic.Messages.Content.Image
 
@@ -53,6 +53,14 @@ defmodule ImageTest do
     test "with invalid base64" do
       assert {:error, "Invalid base64 data provided for the image."} =
                Image.process_image("nonono", :base64)
+    end
+
+    test "with invalid dimension" do
+      assert {:error, "The provided image dimensions {1, 1569} are not supported."} =
+               Image.process_image(
+                 "iVBORw0KGgoAAAANSUhEUgAAAAEAAAYhCAIAAAD0C2PSAAAAHUlEQVR4nO3BMQEAAADCoPVPbQlPoAAAAAAAAP4GGIQAAQlAUEQAAAAASUVORK5CYII=",
+                 :base64
+               )
     end
   end
 end

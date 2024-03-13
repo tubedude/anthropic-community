@@ -2,7 +2,7 @@ defmodule Anthropic.MixProject do
   use Mix.Project
 
   @name "anthropic_community"
-  @version "0.4.0"
+  @version "0.4.1"
   @repo_url "https://github.com/tubedude/anthropic-community"
 
   def project do
@@ -34,6 +34,7 @@ defmodule Anthropic.MixProject do
       {:jason, "~> 1.0"},
       {:ex_image_info, "~> 0.2.4"},
       {:telemetry, "~> 1.0"},
+      {:mox, "~> 1.1.0", only: :test},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end

@@ -1,7 +1,6 @@
 defmodule AnthropicTest.MockTool do
   @behaviour Anthropic.Tools.ToolBehaviour
 
-  def name, do: :mock_tool
   def description, do: "Mock tool for testing."
 
   def parameters,

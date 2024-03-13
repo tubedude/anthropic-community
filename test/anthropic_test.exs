@@ -2,9 +2,13 @@ defmodule AnthropicTest do
   use ExUnit.Case
   doctest Anthropic
 
+  import Mox
+
   alias Anthropic.Messages.Request
   alias Anthropic.Config
   alias AnthropicTest.MockTool
+
+  # Seed 396199 Gives :api_key can not be nil
 
   describe "new/1" do
     test "returns a Anthropic.Message.Request" do
@@ -72,7 +76,10 @@ defmodule AnthropicTest do
         |> Anthropic.add_user_message("Message 1")
         |> Anthropic.add_assistant_message("And the reply is...")
 
-      assert List.first(request.messages).content == [%{type: "text", text: "And the reply is..."}]
+      assert List.first(request.messages).content == [
+               %{type: "text", text: "And the reply is..."}
+             ]
+
       assert List.first(request.messages).role == :assistant
     end
   end
@@ -85,7 +92,7 @@ defmodule AnthropicTest do
         |> Anthropic.add_message(:assistant, "Hi there!")
 
       assert [
-        %{role: :assistant, content: [%{type: "text", text: "Hi there!"}]},
+               %{role: :assistant, content: [%{type: "text", text: "Hi there!"}]},
                %{role: :user, content: [%{type: "text", text: "Hello"}]}
              ] = request.messages
     end
@@ -109,26 +116,48 @@ defmodule AnthropicTest do
       response = %Anthropic.Messages.Response{content: "Hello!", invocations: []}
       request = Anthropic.new()
 
-      assert {:ok, response, request} == Anthropic.process_invocations({:ok, response, request})
+      assert {:ok, %Anthropic.Messages.Response{content: "Hello!"}, request} ==
+               Anthropic.process_invocations({:ok, response, request})
     end
 
-    # TODO implement Mox
-    @tag :skip
     test "processes invocations and updates the request" do
-      response = %Anthropic.Messages.Response{
-        content: "Here are the results:",
-        invocations: [{MockTool, ["value1"]}]
-      }
-
+      # 1) Imagine I have a request that has a Tool.
       request =
         Anthropic.new()
         |> Anthropic.register_tool(MockTool)
 
-      {:ok, updated_response, updated_request} =
+      # 2) And now Imagine I have a response that has requested a invocation
+      response = %Anthropic.Messages.Response{
+        content: [
+          %{
+            text:
+              "<function_calls><invoke><tool_name>AnthropicTest.MockTool</tool_name><parameters><param1>value1</param1><param2>value2</param2></parameters></invoke></function_calls>",
+            type: "text"
+          }
+        ],
+        invocations: [{MockTool, [param1: "value1", param2: "value2"]}]
+      }
+
+      # 4) The server receives the results and reply with: Chad: Ok.
+      Anthropic.MockHTTPClient
+      |> expect(:request, fn _req, _client, _opts ->
+        {:ok,
+         %Finch.Response{
+           status: 200,
+           body:
+             "{\"content\": [{\"text\": \"Chad: OK.\", \"type\": \"text\"}\n  ],\n  \"id\": \"msg_013Zva2CMHLNnXjNJJKqJ2EF\",\n  \"model\": \"claude-3-opus-20240229\",\n  \"role\": \"assistant\",\n  \"stop_reason\": \"end_turn\",\n  \"stop_sequence\": null,\n  \"type\": \"message\",\n  \"usage\": {\"input_tokens\": 10,\"output_tokens\": 25\n  }\n}\n"
+         }}
+      end)
+      |> expect(:build, fn method, url, headers, body, opts ->
+        Finch.build(method, url, headers, body, opts)
+      end)
+
+      # 3) When I process the invocation, the sistem will return an empty invocation list, and will match the mocked response from the server.
+      {:ok, updated_response, _updated_request} =
         Anthropic.process_invocations({:ok, response, request})
 
-      assert updated_response.content =~ "MockTool result"
-      assert updated_request.messages == [%{role: :user, content: "MockTool result"}]
+      assert [] == updated_response.invocations
+      assert Enum.any?(updated_response.content, fn %{"text" => text} -> text =~ "Chad: OK." end)
     end
 
     test "returns an error when a tool is not found" do
@@ -142,6 +171,14 @@ defmodule AnthropicTest do
       assert_raise ArgumentError, "Invocation error: Tool MissingTool not found", fn ->
         Anthropic.process_invocations({:ok, response, request})
       end
+    end
+
+    test "passes forward an Error" do
+      request = Anthropic.new(model: "process_invocations/1 passes forward an Error")
+      response = {:error, %{reason: :unknown}, request}
+
+      assert {:error, %{reason: :unknown}, %Anthropic.Messages.Request{}} =
+               Anthropic.process_invocations(response)
     end
   end
 
@@ -167,13 +204,94 @@ defmodule AnthropicTest do
 
   describe "request_next_message/1" do
     test "requires api_key" do
-      Anthropic.Config.reset(api_key: nil)
+      api_key = Anthropic.Config.get(:api_key)
 
       assert_raise(ArgumentError, fn ->
         Anthropic.new(Anthropic.Config.reset(api_key: nil))
         |> Anthropic.add_user_message("Good morning")
         |> Anthropic.request_next_message()
       end)
+
+      Anthropic.Config.reset(api_key: api_key)
+    end
+
+    test "valid response" do
+      request = Anthropic.new(model: "request_next_message_valid_response")
+
+      Anthropic.MockHTTPClient
+      |> expect(:request, fn _req, _client, _opts ->
+        {:ok,
+         %Finch.Response{
+           status: 200,
+           body:
+             "{\"content\": [{\"text\": \"Oh Hello request_next_message/1 with valid response.\", \"type\": \"text\"}\n  ],\n  \"id\": \"msg_013Zva2CMHLNnXjNJJKqJ2EF\",\n  \"model\": \"claude-3-opus-20240229\",\n  \"role\": \"assistant\",\n  \"stop_reason\": \"end_turn\",\n  \"stop_sequence\": null,\n  \"type\": \"message\",\n  \"usage\": {\"input_tokens\": 10,\"output_tokens\": 25\n  }\n}\n"
+         }}
+      end)
+      |> expect(:build, fn method, url, headers, body, opts ->
+        Finch.build(method, url, headers, body, opts)
+      end)
+
+      assert {:ok, _, _} = Anthropic.request_next_message(request, [])
+    end
+
+    test "server error response" do
+      request = Anthropic.new(model: "request_next_message_server error response")
+
+      Anthropic.MockHTTPClient
+      |> expect(:request, fn _req, _client, _opts ->
+        {:ok,
+         %Finch.Response{
+           status: 400,
+           body: Jason.encode!(%{type: "error", message: "Authentication Error"})
+         }}
+      end)
+      |> expect(:build, fn method, url, headers, body, opts ->
+        Finch.build(method, url, headers, body, opts)
+      end)
+
+      assert {:error, _, _} = Anthropic.request_next_message(request, [])
+    end
+
+    test "network error response" do
+      request = Anthropic.new(model: "request_next_message_network error response")
+
+      Anthropic.MockHTTPClient
+      |> expect(:request, fn _req, _client, _opts ->
+        {:error, %Finch.Error{reason: "Network Error"}}
+      end)
+      |> expect(:build, fn method, url, headers, body, opts ->
+        Finch.build(method, url, headers, body, opts)
+      end)
+
+      assert {:error, %Finch.Error{}, _} = Anthropic.request_next_message(request, [])
+    end
+
+    test "Jason decode error response" do
+      request = Anthropic.new(model: "request_next_message_jason decode error response")
+
+      Anthropic.MockHTTPClient
+      |> expect(:request, fn _req, _client, _opts ->
+        {:error, %Jason.DecodeError{}}
+      end)
+      |> expect(:build, fn method, url, headers, body, opts ->
+        Finch.build(method, url, headers, body, opts)
+      end)
+
+      assert {:error, %Jason.DecodeError{}, _} = Anthropic.request_next_message(request, [])
+    end
+
+    test "Catch all error response" do
+      request = Anthropic.new(model: "request_next_message_jason catch all error")
+
+      Anthropic.MockHTTPClient
+      |> expect(:request, fn _req, _client, _opts ->
+        {:error, "Unknown error"}
+      end)
+      |> expect(:build, fn method, url, headers, body, opts ->
+        Finch.build(method, url, headers, body, opts)
+      end)
+
+      assert {:error, "Unknown error", _} = Anthropic.request_next_message(request, [])
     end
   end
 
@@ -184,7 +302,9 @@ defmodule AnthropicTest do
     end
 
     test "successfully registers a tool module", %{request: request} do
-      assert Anthropic.register_tool(request, MockTool) |> then(&(&1.tools)) |> MapSet.member?(MockTool)
+      assert Anthropic.register_tool(request, MockTool)
+             |> then(& &1.tools)
+             |> MapSet.member?(MockTool)
     end
 
     test "raises an error for unregistered modules", %{request: request} do
@@ -207,7 +327,10 @@ defmodule AnthropicTest do
         Anthropic.register_tool(request, MockTool)
 
       assert MapSet.member?(request.tools, MockTool)
-      assert !(Anthropic.remove_tool(request, MockTool) |> then(&(&1.tools)) |> MapSet.member?(MockTool))
+
+      assert !(Anthropic.remove_tool(request, MockTool)
+               |> then(& &1.tools)
+               |> MapSet.member?(MockTool))
     end
   end
 end

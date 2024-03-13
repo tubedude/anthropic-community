@@ -64,6 +64,7 @@ defmodule Anthropic do
   By attaching to these events, you can monitor the performance and health of your Anthropic API integration, track usage metrics, and handle exceptions as needed.
   """
 
+  require Logger
   alias Anthropic.Messages.Response
   alias Anthropic.Messages.Request
   alias Anthropic.Messages.Content.Image
@@ -323,8 +324,9 @@ defmodule Anthropic do
       %{request | tools: MapSet.put(request.tools, tool_module)}
     else
       raise ArgumentError,
-      "Module #{tool_module} is not loaded. Please use module full name (MyApp.AnthropicTool)"
+            "Module #{tool_module} is not loaded. Please use module full name (MyApp.AnthropicTool)"
     end
+
     # case {Code.ensure_loaded?(tool_module), Enum.member?(request.tools, tool_module)} do
     #   {true, true} ->
     #     request

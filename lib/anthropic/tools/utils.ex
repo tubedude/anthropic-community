@@ -81,8 +81,6 @@ defmodule Anthropic.Tools.Utils do
     ArgumentError -> nil
   end
 
-  defp safe_convert_to_atom(_), do: nil
-
   def execute_async(module, args) when is_atom(module) and is_list(args) do
     Task.async(fn ->
       apply(module, :invoke, args)

@@ -28,6 +28,11 @@ defmodule Tools.UtilsTest do
       actual_invocations = Utils.parse_invoke_function(xml_string)
       assert actual_invocations == expected_invocations
     end
+
+    test "non-existing params atom" do
+      invocation = "<invoke><tool_name>NoNExistant</tool_name><parameters><>Yeah</></parameters></invoke>"
+      assert [nil: []] == Anthropic.Tools.Utils.parse_invoke_function(invocation)
+    end
   end
 
   describe "execute_async/2" do

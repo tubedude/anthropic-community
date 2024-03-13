@@ -4,7 +4,6 @@ defmodule Anthropic.Messages.Response do
 
   This module defines the structure of a response from the Anthropic API and provides functionality to parse the raw response into a structured format. It deals with successful responses as well as various error conditions, translating HTTP responses into a consistent format for the caller to handle.
   """
-  alias Anthropic.Messages.Request
 
   @fields [
     :id,
@@ -14,11 +13,18 @@ defmodule Anthropic.Messages.Response do
     :model,
     :stop_reason,
     :stop_sequence,
-    :usage,
-    :invocations
+    :usage
   ]
 
-  defstruct @fields
+  defstruct id: nil,
+            type: nil,
+            role: nil,
+            content: nil,
+            model: nil,
+            stop_reason: nil,
+            stop_sequence: nil,
+            usage: nil,
+            invocations: []
 
   @type t :: %Anthropic.Messages.Response{
           id: String.t(),
@@ -86,8 +92,6 @@ defmodule Anthropic.Messages.Response do
 
   def parse({:error, response}, _request),
     do: {:error, response}
-
-  defp parse_for_invocations(response, %Request{tools: []}), do: response
 
   defp parse_for_invocations(%{content: content} = response, _request) do
     case Enum.at(content, 0) do

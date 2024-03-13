@@ -16,8 +16,6 @@ defmodule Anthropic.Messages.Request do
 
   @endpoint "/messages"
 
-  require Logger
-
   alias Anthropic.{Config, HTTPClient}
   alias Anthropic.HttpClient.Utils
 
@@ -126,28 +124,27 @@ defmodule Anthropic.Messages.Request do
   """
   def send_request(%__MODULE__{} = request, opts) do
     with {:ok, body} <- Jason.encode(request),
-         {:ok, response} <- build_finch_request(body, opts) do
+         {:ok, response} <- build_httpclient_request(body, opts) do
       {:ok, response}
     else
-      {:error, %Jason.EncodeError{}} -> {:error, :invalid_body_format}
-      {:error, %{reason: reason}} -> {:error, reason}
+      {:error, %Jason.DecodeError{} = error} -> {:error, error}
+      {:error, %Finch.Error{} = error} -> {:error, error}
       {:error, _} = error -> error
     end
     |> Anthropic.Messages.Response.parse(request)
   end
 
-  defp build_finch_request(body, opts) do
+  defp build_httpclient_request(body, opts) do
     sys_opts = Config.opts()
 
     req =
-      Finch.build(
+      HTTPClient.build(
         :post,
         Utils.build_path(@endpoint, sys_opts.api_url),
         Utils.build_header(sys_opts),
         body
       )
 
-    Logger.debug(inspect(req))
-    Finch.request(req, HTTPClient, opts)
+    HTTPClient.request(req, HTTPClient.Engine, opts)
   end
 end
