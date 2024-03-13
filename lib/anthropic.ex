@@ -1,61 +1,27 @@
 defmodule Anthropic do
   @moduledoc """
-  Provides an unofficial Elixir wrapper for the Anthropic API, facilitating access to the Claude LLM model.
+  Provides an unofficial Elixir wrapper for the [Anthropic API](https://docs.anthropic.com/claude/reference/messages_post), facilitating access to the Claude LLM model.
   This module handles configuration, request preparation, and communication with the API, offering an idiomatic Elixir interface to the Anthropic AI capabilities.
 
-  ## Configuration
-
-  The following configuration options are available:
-
-  - `:api_key` - The API key for authenticating requests to the Anthropic API (required).
-  - `:model` - The name of the model to use for generating responses (default: "claude-3-opus-20240229").
-  - `:max_tokens` - The maximum number of tokens allowed in the generated response (default: 1000).
-  - `:temperature` - The sampling temperature for controlling response randomness (default: 1.0).
-  - `:top_p` - The cumulative probability threshold for nucleus sampling (default: 1.0).
-  - `:top_k` - The number of top tokens to consider for sampling (default: 1).
-  - `:anthropic_version` - The version of the Anthropic API to use (default: "2023-06-01").
-  - `:api_url` - The URL of the Anthropic API (default: "https://api.anthropic.com/v1").
-
-  These options can be set in your application's configuration file:
-
-  ```elixir
-  config :anthropic,
-    api_key: "your_api_key",
-    model: "claude-v1",
-    max_tokens: 500,
-    temperature: 0.7,
-    top_p: 0.9,
-    top_k: 5
-  ```
-  Alternatively, you can update the configuration at runtime using Anthropic.Config.reset/1:
-
-  ```elixir
-  Anthropic.Config.reset(max_tokens: 750, temperature: 0.5)
-  ```
   ## Key Features
+  - **Tool Invocations**: Allows registering and executing custom tool modules that implement the `Anthropic.Tools.ToolBehaviour`, enabling dynamic handling of function invocations from the assistant's responses.
   - **Configuration Management**: Centralizes settings for the Anthropic API, such as model specifications, API keys, and request parameters, ensuring a consistent request configuration.
   - **Message Handling**: Supports adding various types of messages to the request, including text and image content, enhancing interaction with the Anthropic AI.
   - **Error Handling**: Implements comprehensive error handling for both request generation and response parsing, providing clear feedback on failures.
   - **Telemetry Integration**: Integrates with Elixir's `:telemetry` library to emit events for key operations, enabling monitoring and observability.
-  - **Tool Invocations**: Allows registering and executing custom tool modules that implement the `Anthropic.Tools.ToolBehaviour`, enabling dynamic handling of function invocations from the assistant's responses.
+
+  ## Configuration
+
+  Important to configure `api_key`. Please refer to `Antrhopic.Config` for more details.
 
   ## Usage
   Start by configuring the API settings, then use the provided functions to add messages or images to your request. Finally, send the request to the Anthropic API and handle the response:
 
   ```elixir
-  config = Anthropic.new(api_key: "your_api_key")
+  config = Anthropic.new(max_tokens: 500) # This will take options that are included in the `Anthropic.Messages.Request` body, not the header. Setting `api_key` here won't work.
   request = Anthropic.add_user_message(config, "Hello, Anthropic!")
   {:ok, response, updated_request} = Anthropic.request_next_message(request)
   ```
-
-  ## Configuration
-  The following configuration options are available:
-
-  - `:api_key` - The API key for authenticating requests to the Anthropic API.
-  - `:model` - The name of the model to use for generating responses (default: "claude-v1").
-  - `:max_tokens` - The maximum number of tokens allowed in the generated response (default: 1000).
-  - `:temperature` - The sampling temperature for controlling response randomness (default: 1.0).
-  - `:top_p` - The cumulative probability threshold for nucleus sampling (default: 1.0).
 
   ## Error Handling
   The module returns errors in the format `{:error, reason}`, where `reason` can be:
@@ -64,28 +30,6 @@ defmodule Anthropic do
   - A `Finch.Error` struct if there was an issue with the HTTP request.
   - A `Jason.DecodeError` struct if there was an issue decoding the JSON response.
   - An `:unknown_error` atom if an unexpected error occurred.
-
-  ## Testing
-  When writing tests for code that uses this module, you can mock the API responses using a library like `Mox`. Here's an example of how to mock a successful response:
-
-  ```elixir
-  defmodule MyAppTest do
-    use ExUnit.Case
-    import Mox
-
-    setup :verify_on_exit!
-
-    test "successful request" do
-      Mox.expect(AnthropicMock, :post, fn _, _, _ ->
-        {:ok, %{body: %{"output" => "Hello, human!"}}}
-      end)
-
-      request = Anthropic.new() |> Anthropic.add_user_message("Hello, Anthropic!")
-      assert {:ok, response, _} = Anthropic.request_next_message(request)
-      assert response.content == "Hello, human!"
-    end
-  end
-  ```
 
   ## Telemetry
 
@@ -130,11 +74,11 @@ defmodule Anthropic do
 
   @spec new(Anthropic.Config.config_options() | nil) :: Anthropic.Messages.Request.t()
   @doc """
-  Initializes a new `Anthropic.Config` struct with the given options, merging them with the default configuration.
+  Initializes a new `Anthropic.Messages.Request` struct with the given options, merging them with the default configuration `Anthropic.Config`.
 
   ## Parameters
 
-  - `opts`: (Optional) A keyword list of options to override the default configuration settings.
+  - `opts`: (Optional) A keyword list of options to override the default configuration settings. Refer to `Anthropic.Messages.Request` for options that can be overridden.
 
   ## Returns
 
@@ -154,7 +98,7 @@ defmodule Anthropic do
 
   ## Parameters
 
-  - `request`: The current `Anthropic.Messages.Request` struct to which the system message will be added.
+  - `request`: A `Anthropic.Messages.Request` struct to which the system message will be added.
   - `message`: The system message to add, must be a binary string.
 
   ## Returns
@@ -176,8 +120,11 @@ defmodule Anthropic do
         "System message must be type String, got #{inspect(message, limit: 50, structs: false, width: 80)}"
       )
 
-
-  @spec add_message(Anthropic.Messages.Request.t(), role(), String.t() | [String.t()] | Request.content_object() | [Request.content_object()]) :: Anthropic.Messages.Request.t()
+  @spec add_message(
+          Anthropic.Messages.Request.t(),
+          role(),
+          String.t() | [String.t()] | Request.content_object() | [Request.content_object()]
+        ) :: Anthropic.Messages.Request.t()
   @doc """
   Adds a message to the request with a specified role.
 
@@ -186,7 +133,7 @@ defmodule Anthropic do
   - `request`: The `Anthropic.Messages.Request` struct to which the message will be added.
   - `role`: The role of the message (e.g., `:user` or `:assistant`).
   - `message`: The content of the message, which can be one of the following:
-    - A binary string representing a single text message.
+    - A binary string representing a single text message, that will be converted to a content of type `text`.
     - A list of binary strings representing multiple text messages.
     - A content object representing a single message with a specific type (e.g., text or image).
     - A list of content objects representing multiple messages with specific types.
@@ -236,15 +183,20 @@ defmodule Anthropic do
     add_message(request, role, [content_object])
   end
 
-  @spec add_user_message(Anthropic.Messages.Request.t(), binary() | Request.content_object()) ::
-          Anthropic.Messages.Request.t()
+  @spec add_user_message(
+          Anthropic.Messages.Request.t(),
+          Anthropic.Messages.Request.message()
+          | list(Anthropic.Messages.Request.message())
+          | binary()
+          | list(binary())
+        ) :: Anthropic.Messages.Request.t()
   @doc """
-  Adds a user message to the request.
+  A shorthand to add a user message to a request.
 
   ## Parameters
 
   - `request`: The `Anthropic.Messages.Request` struct to which the user message will be added.
-  - `message`: The content of the user message, must be a binary string.
+  - `message`: The content of the user message.
 
   ## Returns
 
@@ -254,8 +206,13 @@ defmodule Anthropic do
     add_message(%Request{} = request, :user, message)
   end
 
-  @spec add_assistant_message(Anthropic.Messages.Request.t(), binary()) ::
-          Anthropic.Messages.Request.t()
+  @spec add_assistant_message(
+          Anthropic.Messages.Request.t(),
+          Anthropic.Messages.Request.message()
+          | list(Anthropic.Messages.Request.message())
+          | binary()
+          | list(binary())
+        ) :: Anthropic.Messages.Request.t()
   @doc """
   Adds a assistant message to the request.
 
@@ -272,7 +229,7 @@ defmodule Anthropic do
     add_message(%Request{} = request, :assistant, message)
   end
 
-  @spec add_image(
+  @spec add_user_image(
           Anthropic.Messages.Request.t(),
           {Anthropic.Messages.Content.Image.input_type(), binary()}
         ) :: Anthropic.Messages.Request.t()
@@ -292,13 +249,13 @@ defmodule Anthropic do
 
   ## Examples
 
-      Anthropic.add_image(request, {:path, "/path/to/image.png"})
+      Anthropic.add_user_image(request, {:path, "/path/to/image.png"})
       # Adds an image from a local file path
 
-      Anthropic.add_image(request, {:binary, <<binary data>>})
+      Anthropic.add_user_image(request, {:binary, <<binary data>>})
       # Adds an image from binary data
 
-      Anthropic.add_image(request, {:base64, "base64 encoded image data"})
+      Anthropic.add_user_image(request, {:base64, "base64 encoded image data"})
       # Adds an image from a base64 encoded string
 
   ## Errors
@@ -306,7 +263,7 @@ defmodule Anthropic do
   - Returns `{:error, reason}` if the image processing fails, where `reason` is a descriptive error message.
   """
   @doc since: "0.2.0"
-  def add_image(%Request{} = request, {type, image_path}) do
+  def add_user_image(%Request{} = request, {type, image_path}) do
     {:ok, content} = Image.process_image(image_path, type)
     add_message(request, :user, content)
   end
@@ -316,8 +273,9 @@ defmodule Anthropic do
   Registers a tool module with the given request.
 
   This function allows developers to register tools that implement the `Anthropic.Tools.ToolBehaviour`.
-  Registered tools can be utilized to dynamically handle function invocations from the assistant's responses.
-  It ensures that each tool module is only registered once per request.
+  Registered tools will be added to the system message automaticaly at the time of the request, and will be made
+  available to the assistant. Once the assistant invokes a function call, it will be processed and the result will be returned
+  back to the assistant.
 
   The `Anthropic.Tools.ToolBehaviour` requires the following callbacks to be implemented:
 
@@ -326,7 +284,7 @@ defmodule Anthropic do
     - `name`: An atom representing the name of the parameter.
     - `type`: The type of the parameter, which can be `:string`, `:float`, or `:integer`.
     - `description`: A string describing the parameter.
-  - `invoke/1`: Accepts a list of arguments as strings and returns the result of the tool invocation as a string.
+  - `invoke/1`: Accepts a Keyword list of arguments and returns the result of the tool invocation as a string.
 
   By implementing these callbacks, developers can create custom tools that can be dynamically invoked by the assistant during the conversation.
 
@@ -343,7 +301,7 @@ defmodule Anthropic do
 
   ```elixir
   defmodule MyCustomTool do
-    use Anthropic.Tools.ToolBehaviour
+    @behaviour Anthropic.Tools.ToolBehaviour
 
     def description, do: "A custom tool for demonstration purposes"
 
@@ -360,6 +318,7 @@ defmodule Anthropic do
   request = Anthropic.register_tool(request, MyCustomTool)
   ```
   """
+  @doc since: "0.4.0"
   def register_tool(%Request{} = request, tool_module) when is_atom(tool_module) do
     case {Code.ensure_loaded?(tool_module), Enum.member?(request.tools, tool_module)} do
       {true, true} ->
@@ -374,7 +333,7 @@ defmodule Anthropic do
     end
   end
 
-  @spec request_next_message(Anthropic.Messages.Request.t()) :: any()
+  @spec request_next_message(Anthropic.Messages.Request.t(), any()) :: any()
   @doc """
   Sends the current request to the Anthropic API and awaits the next message in the conversation.
 
@@ -456,20 +415,28 @@ defmodule Anthropic do
   @doc """
   Processes the tool invocations present in the assistant's response.
 
-  This function takes the result of `request_next_message/1` and checks if there are any tool invocations in the response. If invocations are found, it executes each one using the registered tools and appends the results to the conversation. It then sends the updated conversation back to the API for further processing.
+  This function takes the result of `request_next_message/1` and checks if there are any tool invocations in the response.
+  If invocations are found, it executes each one using the registered tools and appends the results to the conversation.
+  It then sends the updated conversation back to the API for further processing.
 
   ## Parameters
   - `result`: The result of `request_next_message/1`, which can be either `{:ok, response, request}` or `{:error, response, request}`.
+  - `request`: A `Anthropic.Messages.Request`.
 
   ## Returns
-  - `{:ok, response, updated_request}`: If the invocations are processed successfully, where `response` is the original response from the API, and `updated_request` is the request struct updated with the invocation results.
-  - `{:error, response, request}`: If an error occurs during the processing of invocations, where `response` contains the error details, and `request` is the original request struct.
+  - `{:ok, response, updated_request}`: If the invocations are processed successfully, where `response` is the original response
+  from the API, and `updated_request` is the request struct updated with the invocation results.
+  - `{:error, response, request}`: If an error occurs during the processing of invocations, where `response` contains the error
+  details, and `request` is the original request struct.
 
   ## Raises
-  - `ArgumentError`: If a tool invocation fails due to the specified tool not being registered or if there's an error during the execution of the tool.
+  - `ArgumentError`: If a tool invocation fails due to the specified tool not being registered or if there's an error during the
+  execution of the tool.
 
-  This function is responsible for handling the dynamic execution of tools based on the assistant's responses. It allows for a more interactive and extensible conversation flow by processing tool invocations and incorporating their results into the ongoing conversation.
+  This function is responsible for handling the dynamic execution of tools based on the assistant's responses. It allows for a
+  more interactive and extensible conversation flow by processing tool invocations and incorporating their results into the ongoing conversation.
   """
+  @doc since: "0.4.0"
   def process_invocations({:ok, %Response{} = response, %Request{} = request}) do
     case cycle_invocations(response, request) do
       {:ok, [], updated_request} ->

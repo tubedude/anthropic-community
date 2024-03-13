@@ -1,6 +1,37 @@
 defmodule Anthropic.Config do
   @moduledoc """
-  Module for setting up the configuration of Anthropic API.
+  Module is responsible for holding default configuration on runtime.
+
+  ## Configuration
+
+  The following configuration options are available:
+
+  - `:api_key` - The API key for authenticating requests to the Anthropic API (required).
+  - `:model` - The name of the model to use for generating responses (default: "claude-3-opus-20240229").
+  - `:max_tokens` - The maximum number of tokens allowed in the generated response (default: 1000).
+  - `:temperature` - The sampling temperature for controlling response randomness (default: 1.0).
+  - `:top_p` - The cumulative probability threshold for nucleus sampling (default: 1.0).
+  - `:top_k` - The number of top tokens to consider for sampling (default: 1).
+  - `:anthropic_version` - The version of the Anthropic API to use (default: "2023-06-01").
+  - `:api_url` - The URL of the Anthropic API (default: "https://api.anthropic.com/v1").
+
+  These options can be set in your application's configuration file:
+
+  ```elixir
+  config :anthropic,
+    api_key: "your_api_key",
+    model: "claude-v1",
+    max_tokens: 500,
+    temperature: 0.7,
+    top_p: 0.9,
+    top_k: 5
+  ```
+  Alternatively, you can update the configuration at runtime using Anthropic.Config.reset/1:
+
+  ```elixir
+  Anthropic.Config.reset(max_tokens: 750, temperature: 0.5)
+  ```
+
   """
 
   use GenServer
