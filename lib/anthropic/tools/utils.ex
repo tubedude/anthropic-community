@@ -1,7 +1,5 @@
 defmodule Anthropic.Tools.Utils do
-  @moduledoc """
-  Defines tooling to use with modules that implement `Anthropic.Tools.ToolBehaviour`.
-  """
+  @moduledoc false
 
   def generate_tool_description(tool_module) when is_atom(tool_module) do
     description = tool_module.description()
@@ -57,7 +55,6 @@ defmodule Anthropic.Tools.Utils do
   defp safe_convert_to_atom(_), do: nil
 
   def execute_async(module, args) when is_atom(module) and is_list(args) do
-    dbg(args)
     Task.async(fn ->
       apply(module, :invoke, args)
     end)
@@ -67,6 +64,7 @@ defmodule Anthropic.Tools.Utils do
     results =
       Enum.zip(tool_names, Task.await_many(tasks))
       |> Enum.map(fn {tool_name, result} -> {tool_name, result} end)
+
     build_xml(results)
   end
 

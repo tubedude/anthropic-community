@@ -50,6 +50,19 @@ defmodule AnthropicTest do
       assert List.last(request.messages).content == [%{type: "text", text: "Message 3"}]
       assert List.last(request.messages).role == :user
     end
+
+    test "appends a list of different messages" do
+      request =
+        Anthropic.new()
+        |> Anthropic.add_user_message(["Message 1", %{type: "text", content: ["Message 2"]}])
+
+      assert List.last(request.messages).content == [
+               %{text: "Message 1", type: "text"},
+               %{type: "text", content: ["Message 2"]}
+             ]
+
+      assert List.last(request.messages).role == :user
+    end
   end
 
   describe "add_assistant_message/2" do
@@ -72,7 +85,7 @@ defmodule AnthropicTest do
         |> Anthropic.add_message(:assistant, "Hi there!")
 
       assert [
-               %{role: :user, content: [ %{type: "text", text: "Hello"}]},
+               %{role: :user, content: [%{type: "text", text: "Hello"}]},
                %{role: :assistant, content: [%{type: "text", text: "Hi there!"}]}
              ] = request.messages
     end
@@ -83,7 +96,10 @@ defmodule AnthropicTest do
         |> Anthropic.add_message(:user, ["Message 1", "Message 2"])
 
       assert [
-               %{role: :user, content: [%{text: "Message 1", type: "text"},%{text: "Message 2", type: "text"} ]},
+               %{
+                 role: :user,
+                 content: [%{text: "Message 1", type: "text"}, %{text: "Message 2", type: "text"}]
+               }
              ] = request.messages
     end
   end
@@ -133,16 +149,18 @@ defmodule AnthropicTest do
     test "from valid path" do
       elem =
         Anthropic.new()
-        |> Anthropic.add_image({:path, "test/images/image.png"})
+        |> Anthropic.add_user_image({:path, "test/images/image.png"})
         |> then(fn req -> req.messages end)
         |> List.first()
 
       assert %{
                role: :user,
-               content: [%{
-                 type: "image",
-                 source: %{data: _data, type: "base64", media_type: "image/png"}
-               }]
+               content: [
+                 %{
+                   type: "image",
+                   source: %{data: _data, type: "base64", media_type: "image/png"}
+                 }
+               ]
              } = elem
     end
   end
