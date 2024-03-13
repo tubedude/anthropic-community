@@ -13,11 +13,6 @@ defmodule Anthropic.Tools.ToolBehaviour do
   defmacro __using__(_) do
     quote do
       @behaviour Anthropic.Tools.ToolBehaviour
-
-      # Default implementations that must be overridden
-      def description, do: raise("You must implement the description/0 function in your module.")
-      def parameters, do: raise("You must implement the parameters/0 function in your module.")
-      def invoke(_params), do: raise("You must implement the invoke/1 function in your module.")
     end
   end
 end

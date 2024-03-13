@@ -46,7 +46,7 @@ defmodule Anthropic.Messages.ResponseTest do
         )
 
       # Expected invocation format
-      expected_invocations = [{MockTool, ["test_value1", "42"]}]
+      expected_invocations = [{MockTool, [param1: "test_value1", param2: "42"]}]
 
       # Assert invocations are parsed and stored correctly
       assert parsed_response.invocations == expected_invocations
