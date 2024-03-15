@@ -36,4 +36,4 @@ jobs:
     - name: Install dependencies
       run: mix deps.get
     - name: Run tests
-      run: ANTHROPIC_API_KEY=Loaded_for_tests mix test
+      run: mix test
