@@ -1,4 +1,9 @@
-## 0.4.1 - 2024-03-13
+## 0.4.2 - 2024-03-15
+
+### Fixed
+- Prevent to add system message when no `Anthropic.Tools.ToolBehaviour` is registered.
+
+## 0.4.1 - 2024-03-15
 
 ### Improved
 - Removed GenServer from `Anthropic.Config`. It will be created from `Application.get_env` or from the supplied options.
