@@ -1,33 +1,37 @@
 defmodule Anthropic.Tools.Utils do
   @moduledoc false
 
-  @spec decorate_tools_description(binary(), list(atom())) :: <<_::64, _::_*8>>
+  @spec decorate_tools_description(any(), MapSet.t()) :: binary()
   def decorate_tools_description(system, tools) do
-    tools_description =
-      tools
-      |> Enum.map(&generate_tool_description/1)
-      |> Enum.join("\n")
+    if MapSet.size(tools) == 0 do
+      system
+    else
+      tools_description =
+        tools
+        |> Enum.map(&generate_tool_description/1)
+        |> Enum.join("\n")
 
-    """
-    #{system}
+      """
+      #{system}
 
-    In this environment you have access to a set of tools you can use to answer the user's question.
-    You may call them like this:
-    <function_calls>
-      <invoke>
-        <tool_name>$TOOL_NAME</tool_name>
-        <parameters>
-          <$PARAMETER_NAME>$PARAMETER_VALUE</$PARAMETER_NAME>
-          ...
-        </parameters>
-      </invoke>
-    </function_calls>
-    When you feel the need to call functions, only send the proper XML. Do not write anything else and wait for my reply.
-    Here are the tools available:
-    <tools>
-    #{tools_description}
-    </tools>
-    """
+      In this environment you have access to a set of tools you can use to answer the user's question.
+      You may call them like this:
+      <function_calls>
+        <invoke>
+          <tool_name>$TOOL_NAME</tool_name>
+          <parameters>
+            <$PARAMETER_NAME>$PARAMETER_VALUE</$PARAMETER_NAME>
+            ...
+          </parameters>
+        </invoke>
+      </function_calls>
+      When you feel the need to call functions, only send the proper XML. Do not write anything else and wait for my reply.
+      Here are the tools available:
+      <tools>
+      #{tools_description}
+      </tools>
+      """
+    end
   end
 
   defp generate_tool_description(tool_module) when is_atom(tool_module) do

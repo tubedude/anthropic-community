@@ -87,4 +87,20 @@ defmodule Anthropic.Messages.RequestTest do
                Anthropic.Messages.Request.send_request(request, [])
     end
   end
+
+  describe "Jason.Encode implementation" do
+    test "should not print tool in system message if there are no tools" do
+      request =
+        Anthropic.new()
+      {:ok, encoded} = Jason.encode(request)
+      assert !(encoded =~ "<tool_name>$TOOL_NAME</tool_name>")
+    end
+    test "should print tool in system message if there one or more tools" do
+      request =
+        Anthropic.new()
+        |> Anthropic.register_tool(AnthropicTest.MockTool)
+      {:ok, encoded} = Jason.encode(request)
+      assert encoded =~ "<tool_name>$TOOL_NAME</tool_name>"
+    end
+  end
 end
