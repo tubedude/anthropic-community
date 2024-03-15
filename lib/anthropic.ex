@@ -71,9 +71,9 @@ defmodule Anthropic do
   alias Anthropic.Config
 
   @type role :: :user | :assistant
-  @type message :: %{role: role, content: any()}
+  @type message :: %{role: role(), content: any()}
 
-  @spec new(Anthropic.Config.config_options() | nil) :: Anthropic.Messages.Request.t()
+  @spec new(keyword()) :: struct()
   @doc """
   Initializes a new `Anthropic.Messages.Request` struct with the given options, merging them with the default configuration `Anthropic.Config`.
 
@@ -86,9 +86,17 @@ defmodule Anthropic do
   - A new `Anthropic.Messages.Request` struct populated with the merged configuration options.
   """
   def new(opts \\ []) do
-    Config.opts()
-    |> Map.merge(Enum.into(opts, %{}))
-    |> then(fn map -> struct(Anthropic.Config, map) end)
+    config =
+      case Keyword.get(opts, :config, Config.create(opts)) do
+        %Anthropic.Config{} = value ->
+          value
+
+        error ->
+          raise ArgumentError,
+                "Config must be a valid %Anthropic.Config{}. Got: #{inspect(error)}"
+      end
+
+    Keyword.merge(opts, config: config)
     |> Request.create()
   end
 
@@ -121,11 +129,6 @@ defmodule Anthropic do
         "System message must be type String, got #{inspect(message, limit: 50, structs: false, width: 80)}"
       )
 
-  @spec add_message(
-          Anthropic.Messages.Request.t(),
-          role(),
-          String.t() | [String.t()] | Request.content_object() | [Request.content_object()]
-        ) :: Anthropic.Messages.Request.t()
   @doc """
   Adds a message to the request with a specified role.
 
@@ -206,13 +209,6 @@ defmodule Anthropic do
     add_message(%Request{} = request, :user, message)
   end
 
-  @spec add_assistant_message(
-          Anthropic.Messages.Request.t(),
-          Anthropic.Messages.Request.message()
-          | list(Anthropic.Messages.Request.message())
-          | binary()
-          | list(binary())
-        ) :: Anthropic.Messages.Request.t()
   @doc """
   Adds a assistant message to the request.
 
@@ -344,7 +340,7 @@ defmodule Anthropic do
     %{request | tools: MapSet.delete(request.tools, tool_module)}
   end
 
-  @spec request_next_message(Anthropic.Messages.Request.t(), any()) :: any()
+  @spec request_next_message(Anthropic.Messages.Request.t(), keyword() | nil) :: any()
   @doc """
   Sends the current request to the Anthropic API and awaits the next message in the conversation.
 
@@ -376,7 +372,6 @@ defmodule Anthropic do
     |> wrap_to_telemetry()
   end
 
-  # Prepares the response from the API for successful requests, updating the request with the assistant's message.
   defp prepare_response({:ok, response}, request) do
     updated_request =
       request
@@ -385,7 +380,6 @@ defmodule Anthropic do
     {:ok, response, updated_request}
   end
 
-  # Handles error responses from the API, passing through the error and the original request for further handling.
   defp prepare_response({:error, response}, request) do
     {:error, response, request}
   end

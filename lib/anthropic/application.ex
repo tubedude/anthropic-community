@@ -6,7 +6,6 @@ defmodule Anthropic.Application do
   @doc false
   def start(_type, _args) do
     children = [
-      Anthropic.Config,
       {Finch, name: Anthropic.HTTPClient.Engine}
     ]
 

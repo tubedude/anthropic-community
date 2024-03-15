@@ -55,16 +55,23 @@ defmodule Anthropic.Messages.ResponseTest do
     test "parses bad body", %{request: request} do
       bad_body = "%{ no: \"good}"
 
-      assert {:error, %Jason.DecodeError{position: 0, token: nil, data: "%{ no: \"good}"}} = Response.parse({:ok, %Finch.Response{status: 200, body: bad_body}}, request)
+      assert {:error, %Jason.DecodeError{position: 0, token: nil, data: "%{ no: \"good}"}} =
+               Response.parse({:ok, %Finch.Response{status: 200, body: bad_body}}, request)
     end
 
     test "parses bad status", %{request: request} do
       body = %{type: "error", error: "erro?"} |> Jason.encode!()
       bad_body = "%{ no: \"good}"
 
-      assert {:error, %Finch.Response{body: %{"error" => "erro?", "type" => "error"}, status: 401}} = Response.parse({:ok, %Finch.Response{status: 401, body: body}}, request)
-      assert {:error, %Finch.Response{body: _, status: 401}} = Response.parse({:ok, %Finch.Response{status: 401, body: bad_body}}, request)
-      assert {:error, %Finch.Response{body: ^body, status: 500}} = Response.parse({:ok, %Finch.Response{status: 500, body: body}}, request)
+      assert {:error,
+              %Finch.Response{body: %{"error" => "erro?", "type" => "error"}, status: 401}} =
+               Response.parse({:ok, %Finch.Response{status: 401, body: body}}, request)
+
+      assert {:error, %Finch.Response{body: _, status: 401}} =
+               Response.parse({:ok, %Finch.Response{status: 401, body: bad_body}}, request)
+
+      assert {:error, %Finch.Response{body: ^body, status: 500}} =
+               Response.parse({:ok, %Finch.Response{status: 500, body: body}}, request)
     end
 
     test "parses bad invocation" do
@@ -72,8 +79,8 @@ defmodule Anthropic.Messages.ResponseTest do
 
       body = %{content: [%{type: "image", data: "data"}]} |> Jason.encode!()
 
-      assert {:ok, %Anthropic.Messages.Response{}} = Response.parse({:ok, %Finch.Response{status: 200, body: body}}, request)
+      assert {:ok, %Anthropic.Messages.Response{}} =
+               Response.parse({:ok, %Finch.Response{status: 200, body: body}}, request)
     end
-
   end
 end

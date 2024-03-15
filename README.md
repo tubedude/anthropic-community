@@ -24,7 +24,7 @@ end
 ```
 
 ## Configuration
-Add or create a config file to provide the `api_key` as in the example below.
+Add or create a config file to provide the `api_key` as in the example below. Or pass an `:api_key` as option on `Anthropic.new(api_key: "key")`
 
 ```elixir
 # config/config.exs

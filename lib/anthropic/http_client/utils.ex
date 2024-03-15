@@ -55,9 +55,6 @@ defmodule Anthropic.HttpClient.Utils do
         {"content-type", "application/json"}
       ]
   """
-  def build_header(%Config{api_key: key}) when is_nil(key),
-    do: raise(ArgumentError, "Anthropic :api_key can not be nil.")
-
   def build_header(%Config{} = opts) do
     [
       {"x-api-key", opts.api_key},

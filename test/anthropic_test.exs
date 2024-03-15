@@ -5,7 +5,6 @@ defmodule AnthropicTest do
   import Mox
 
   alias Anthropic.Messages.Request
-  alias Anthropic.Config
   alias AnthropicTest.MockTool
 
   # Seed 396199 Gives :api_key can not be nil
@@ -15,11 +14,17 @@ defmodule AnthropicTest do
       assert %Request{} = Anthropic.new()
     end
 
-    test "can override a config on runtime without altering GenServer" do
-      assert %Request{temperature: 0.5} = Anthropic.new(temperature: 0.5)
-      assert %Request{max_tokens: 100} = Anthropic.new(max_tokens: 100)
-      assert %Config{temperature: 1.0} = Anthropic.Config.opts()
-      assert %Config{max_tokens: 1000} = Anthropic.Config.opts()
+    test "bad opts" do
+      assert_raise ArgumentError, "Config must be a valid %Anthropic.Config{}. Got: \"oi\"", fn ->
+        Anthropic.new(config: "oi")
+      end
+    end
+
+    test "with multiple opts" do
+      assert %Anthropic.Messages.Request{
+               max_tokens: 500,
+               __config__: %Anthropic.Config{api_key: "new"}
+             } = Anthropic.new(api_key: "new", max_tokens: 500)
     end
   end
 
@@ -203,17 +208,17 @@ defmodule AnthropicTest do
   end
 
   describe "request_next_message/1" do
-    test "requires api_key" do
-      api_key = Anthropic.Config.get(:api_key)
+    # test "requires api_key" do
+    #   api_key = Anthropic.Config.get(:api_key)
 
-      assert_raise(ArgumentError, fn ->
-        Anthropic.new(Anthropic.Config.reset(api_key: nil))
-        |> Anthropic.add_user_message("Good morning")
-        |> Anthropic.request_next_message()
-      end)
+    #   assert_raise(ArgumentError, fn ->
+    #     Anthropic.new(Anthropic.Config.reset(api_key: nil))
+    #     |> Anthropic.add_user_message("Good morning")
+    #     |> Anthropic.request_next_message()
+    #   end)
 
-      Anthropic.Config.reset(api_key: api_key)
-    end
+    #   Anthropic.Config.reset(api_key: api_key)
+    # end
 
     test "valid response" do
       request = Anthropic.new(model: "request_next_message_valid_response")

@@ -2,22 +2,28 @@ defmodule Anthropic.Messages.Request do
   @moduledoc """
   Defines the structure and functionality for creating and sending requests to the Anthropic API.
 
-  This module is responsible for encapsulating the data needed for a request, including model specifications, messages, and various control parameters. It also implements the `Jason.Encoder` protocol to ensure that instances of this struct can be serialized to JSON format, which is required for API requests.
+  This module encapsulates the data needed for a request, including model specifications, messages, and various control parameters.
+  It also implements the `Jason.Encoder` protocol to serialize instances of this struct to JSON format for API requests.
 
-  The following configuration options are available:
-
+  Configuration options:
   - `:model` - The name of the model to use for generating responses (default: "claude-3-opus-20240229").
   - `:max_tokens` - The maximum number of tokens allowed in the generated response (default: 1000).
   - `:temperature` - The sampling temperature for controlling response randomness (default: 1.0).
   - `:top_p` - The cumulative probability threshold for nucleus sampling (default: 1.0).
-  - `:top_k` - The number of most probable next words considered at each step in sampling for text generation. (default: nil).
-
+  - `:top_k` - The number of most probable next words considered at each step in sampling for text generation (default: nil).
   """
 
   @endpoint "/messages"
 
-  alias Anthropic.{Config, HTTPClient}
+  alias Anthropic.{HTTPClient}
   alias Anthropic.HttpClient.Utils
+
+  @default [
+    model: "claude-3-opus-20240229",
+    max_tokens: 1000,
+    temperature: 1.0,
+    top_k: 1
+  ]
 
   @doc """
   The structure of a request to the Anthropic API.
@@ -34,6 +40,7 @@ defmodule Anthropic.Messages.Request do
             temperature: nil,
             top_p: nil,
             top_k: nil,
+            __config__: nil,
             tools: MapSet.new()
 
   @type t :: %__MODULE__{
@@ -47,6 +54,7 @@ defmodule Anthropic.Messages.Request do
           temperature: float() | nil,
           top_p: float() | nil,
           top_k: integer() | nil,
+          __config__: Anthropic.Config.t(),
           tools: MapSet.t(atom())
         }
 
@@ -81,32 +89,26 @@ defmodule Anthropic.Messages.Request do
     end
   end
 
-  @spec create(Anthropic.Config.t()) :: Anthropic.Messages.Request.t()
   @doc """
   Creates a new request struct based on the provided configuration.
 
   Initializes a request with the parameters specified in the configuration, setting up default values for the request structure.
 
   ## Parameters
-
-  - `opts`: The Anthropic.Config struct containing configuration options for the request.
+  - `opts`: Keyword list containing configuration options for the request.
 
   ## Returns
-
-  - A new Anthropic.Messages.Request struct initialized with the provided configuration options.
+  A new `Anthropic.Messages.Request` struct initialized with the provided configuration options.
   """
-  def create(%Anthropic.Config{} = opts) do
-    %__MODULE__{
-      model: opts.model,
-      max_tokens: opts.max_tokens,
-      temperature: opts.temperature,
-      top_p: opts.top_p,
-      top_k: opts.top_k
-    }
+  def create(opts \\ []) do
+    @default
+    |> Keyword.merge(Anthropic.Config.build_system_configs(@default))
+    |> Keyword.merge(opts)
+    |> Anthropic.Config.validate_config()
+    |> then(&Keyword.put(&1, :__config__, Keyword.get(&1, :config)))
+    |> then(&struct(__MODULE__, &1))
   end
 
-  @spec send_request(Anthropic.Messages.Request.t(), Keyword.t() | nil) ::
-          {:error, any()} | {:ok, Anthropic.Messages.Response.t()}
   @doc """
   Encodes the request to JSON and sends it to the Anthropic API via the Finch HTTP client.
 
@@ -124,7 +126,7 @@ defmodule Anthropic.Messages.Request do
   """
   def send_request(%__MODULE__{} = request, opts) do
     with {:ok, body} <- Jason.encode(request),
-         {:ok, response} <- build_httpclient_request(body, opts) do
+         {:ok, response} <- build_httpclient_request(request, body, opts) do
       {:ok, response}
     else
       {:error, %Jason.DecodeError{} = error} -> {:error, error}
@@ -134,8 +136,8 @@ defmodule Anthropic.Messages.Request do
     |> Anthropic.Messages.Response.parse(request)
   end
 
-  defp build_httpclient_request(body, opts) do
-    sys_opts = Config.opts()
+  defp build_httpclient_request(request, body, opts) do
+    sys_opts = request.__config__
 
     req =
       HTTPClient.build(

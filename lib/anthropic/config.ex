@@ -34,116 +34,42 @@ defmodule Anthropic.Config do
 
   """
 
-  use GenServer
-
-  @default %{
-    model: "claude-3-opus-20240229",
+  @default [
     anthropic_version: "2023-06-01",
     api_url: "https://api.anthropic.com/v1",
-    max_tokens: 1000,
-    temperature: 1.0,
-    api_key: nil,
-    top_k: 1
-  }
+    api_key: "API_KEY must be set"
+  ]
 
-  defstruct model: nil,
-            anthropic_version: nil,
+  defstruct anthropic_version: nil,
             api_url: nil,
-            max_tokens: nil,
-            temperature: nil,
-            top_p: nil,
-            top_k: nil,
-            api_key: nil
+            api_key: "API_KEY not set"
 
   @type t :: %__MODULE__{
-          model: String.t() | nil,
-          anthropic_version: String.t() | nil,
-          api_url: String.t() | nil,
-          max_tokens: non_neg_integer() | nil,
-          temperature: float() | nil,
-          top_p: float() | nil,
-          top_k: non_neg_integer() | nil,
-          api_key: String.t() | nil
+          anthropic_version: String.t(),
+          api_url: String.t(),
+          api_key: String.t()
         }
 
   @type config_option ::
-          {:model, String.t()}
-          | {:anthropic_version, String.t()}
+          {:anthropic_version, String.t()}
           | {:api_url, String.t()}
-          | {:max_tokens, non_neg_integer()}
-          | {:temperature, float()}
-          | {:top_p, float()}
-          | {:top_k, non_neg_integer()}
           | {:api_key, String.t()}
 
   @type config_options :: [config_option()]
-  ### API
 
-  def start_link(opts) do
-    name = Keyword.get(opts, :name,  __MODULE__)
-    GenServer.start_link(__MODULE__, opts, name: name)
+  @spec create(keyword()) :: struct()
+  def create(opts) do
+    @default
+    |> Keyword.merge(build_system_configs(@default))
+    |> Keyword.merge(opts)
+    |> validate_config()
+    |> then(&struct(__MODULE__, &1))
   end
 
-  @impl true
-  def init(_opts) do
-    state =
-      @default
-      |> Enum.map(&get_config_variable/1)
-      |> Enum.into(%{})
-      |> validate_config()
-      |> then(fn s -> struct(%__MODULE__{}, s) end)
-
-    {:ok, state}
+  def build_system_configs(opts) do
+    opts
+    |> Enum.map(&get_config_variable/1)
   end
-
-  def get(key), do: GenServer.call(__MODULE__, {:get, key})
-
-  @doc """
-  Retrieves the current configuration options.
-
-  This function queries the GenServer to return the current state, which represents the active configuration.
-
-  ## Returns
-
-  - The current configuration as a `Anthropic.Config` struct.
-  """
-  def opts, do: GenServer.call(__MODULE__, :opts)
-
-  @doc """
-  Resets specific configuration options.
-
-  Allows dynamically updating the configuration by merging provided options with the current state. The updated configuration is then validated.
-
-  ## Parameters
-
-  - `keyword_list`: A keyword list of configuration options to update.
-
-  ## Returns
-
-  - The updated configuration as a `Anthropic.Config` struct.
-  """
-  def reset(keyword_list), do: GenServer.call(__MODULE__, {:reset, keyword_list})
-
-  ### Callbacks
-
-  @impl true
-  def handle_call(:opts, _from, state), do: {:reply, state, state}
-
-  def handle_call({:get, key}, _from, state),
-    do: {:reply, get_in(state, [Access.key!(key)]), state}
-
-  def handle_call({:reset, keyword_list}, _from, state) do
-    new_state =
-      keyword_list
-      |> Enum.into(%{})
-      |> then(fn map -> Map.merge(state, map) end)
-      |> validate_config()
-      |> then(fn s -> struct(%__MODULE__{}, s) end)
-
-    {:reply, new_state, new_state}
-  end
-
-  ### Helpers
 
   defp get_config_variable({key, default}) do
     value =
@@ -152,18 +78,20 @@ defmodule Anthropic.Config do
     {key, value}
   end
 
-  defp validate_config(config) do
+  def validate_config(config) do
     config
-    |> Enum.reduce(%{}, fn {key, value}, acc ->
+    |> Enum.reduce([], fn {key, value}, acc ->
       validated_value =
         case key do
           :max_tokens -> validate_max_tokens(value)
           :temperature -> validate_temperature(value)
           :top_p -> validate_top_p(value)
+          :api_key -> validate_is_binary(key, value)
+          :api_url -> validate_is_binary(key, value)
           _ -> value
         end
 
-      Map.put(acc, key, validated_value)
+      Keyword.put(acc, key, validated_value)
     end)
   end
 
@@ -182,6 +110,11 @@ defmodule Anthropic.Config do
 
   defp validate_top_p(_),
     do: raise(ArgumentError, "Invalid top_p value, must be a float between 0.0 and 1.0.")
+
+  defp validate_is_binary(_key, value) when is_binary(value), do: value
+
+  defp validate_is_binary(key, value),
+    do: raise(ArgumentError, ":#{key} must be a String.t(). Got: #{inspect(value)}")
 
   defimpl Enumerable, for: Anthropic.Config do
     def count(%Anthropic.Config{} = config) do

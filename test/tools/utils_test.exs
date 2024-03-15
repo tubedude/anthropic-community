@@ -30,7 +30,9 @@ defmodule Tools.UtilsTest do
     end
 
     test "non-existing params atom" do
-      invocation = "<invoke><tool_name>NoNExistant</tool_name><parameters><>Yeah</></parameters></invoke>"
+      invocation =
+        "<invoke><tool_name>NoNExistant</tool_name><parameters><>Yeah</></parameters></invoke>"
+
       assert [nil: []] == Anthropic.Tools.Utils.parse_invoke_function(invocation)
     end
   end

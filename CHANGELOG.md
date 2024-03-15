@@ -1,5 +1,10 @@
 ## 0.4.1 - 2024-03-13
 
+### Improved
+- Removed GenServer from `Anthropic.Config`. It will be created from `Application.get_env` or from the supplied options.
+- Added Mox to test environment.
+- Increased test coverage.
+
 ### Breaking change
 - Changed the tool field type to MapSet
 
