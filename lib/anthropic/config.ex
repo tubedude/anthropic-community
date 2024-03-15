@@ -1,6 +1,6 @@
 defmodule Anthropic.Config do
   @moduledoc """
-  Module is responsible for holding default configuration on runtime.
+  Module provides struct for Anthropic.Config, and provides validations for various config options.
 
   ## Configuration
 
@@ -26,23 +26,18 @@ defmodule Anthropic.Config do
     top_p: 0.9,
     top_k: 5
   ```
-  Alternatively, you can update the configuration at runtime using Anthropic.Config.reset/1:
-
-  ```elixir
-  Anthropic.Config.reset(max_tokens: 750, temperature: 0.5)
-  ```
 
   """
 
   @default [
     anthropic_version: "2023-06-01",
     api_url: "https://api.anthropic.com/v1",
-    api_key: "API_KEY must be set"
+    api_key: nil
   ]
 
   defstruct anthropic_version: nil,
             api_url: nil,
-            api_key: "API_KEY not set"
+            api_key: nil
 
   @type t :: %__MODULE__{
           anthropic_version: String.t(),

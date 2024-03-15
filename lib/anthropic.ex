@@ -12,15 +12,16 @@ defmodule Anthropic do
 
   ## Configuration
 
-  Important to configure `api_key`. Please refer to `Antrhopic.Config` for more details.
+  Please refer to `Antrhopic.Config` for more details.
 
   ## Usage
   Start by configuring the API settings, then use the provided functions to add messages or images to your request. Finally, send the request to the Anthropic API and handle the response:
 
   ```elixir
-  config = Anthropic.new(max_tokens: 500) # This will take options that are included in the `Anthropic.Messages.Request` body, not the header. Setting `api_key` here won't work.
-  request = Anthropic.add_user_message(config, "Hello, Anthropic!")
-  {:ok, response, updated_request} = Anthropic.request_next_message(request)
+  {:ok, response, updated_request} =
+    Anthropic.new(max_tokens: 500, api_key: "API_KEY")
+    |> Anthropic.add_user_message(config, "Hello, Anthropic!")
+    |> Anthropic.request_next_message()
   ```
 
   ## Error Handling
@@ -336,6 +337,7 @@ defmodule Anthropic do
     # end
   end
 
+  @doc since: "0.4.1"
   def remove_tool(%Request{} = request, tool_module) do
     %{request | tools: MapSet.delete(request.tools, tool_module)}
   end

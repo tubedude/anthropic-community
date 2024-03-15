@@ -16,6 +16,9 @@ defmodule Anthropic.ConfigTest do
 
       assert %Anthropic.Config{api_key: "just_in_api_key"} =
                Config.create(api_key: "just_in_api_key")
+
+      assert_raise ArgumentError, ":api_key must be a String.t(). Got: nil", fn -> %Anthropic.Config{} = Config.create(api_key: nil) end
+      assert_raise ArgumentError, ":api_key must be a String.t(). Got: 123", fn -> %Anthropic.Config{} = Config.create(api_key: 123) end
     end
   end
 
