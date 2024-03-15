@@ -15,6 +15,8 @@ defmodule Anthropic.Messages.Request do
 
   @endpoint "/messages"
 
+  require Logger
+
   alias Anthropic.{HTTPClient}
   alias Anthropic.HttpClient.Utils
 
@@ -133,6 +135,7 @@ defmodule Anthropic.Messages.Request do
       {:error, %Finch.Error{} = error} -> {:error, error}
       {:error, _} = error -> error
     end
+    |> tap(fn _ -> Logger.debug("Receive response from Anthropic. Starting to parse it") end)
     |> Anthropic.Messages.Response.parse(request)
   end
 

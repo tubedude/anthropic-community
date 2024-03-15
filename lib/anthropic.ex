@@ -56,6 +56,7 @@ defmodule Anthropic do
 
   - `:model` - The name of the model used for the request.
   - `:max_tokens` - The maximum number of tokens allowed in the generated response.
+  - `:request_metadata` - The metadata map that is possible to include in each request.
   - `:input_tokens` - The number of tokens in the input message (only available in the `:stop` event).
   - `:output_tokens` - The number of tokens in the generated response (only available in the `:stop` event).
   - `:kind` - The type of exception that occurred (only available in the `:exception` event).
@@ -358,9 +359,11 @@ defmodule Anthropic do
   This function is the main mechanism through which conversations are advanced, by sending user or assistant messages to the API and incorporating the API's responses into the ongoing conversation.
   """
   def request_next_message(%Request{} = request, http_client_opts \\ []) do
+    Logger.debug("Requesting Next Message")
+
     :telemetry.span(
       [:anthropic, :request_next_message],
-      %{model: request.model, max_tokens: request.max_tokens},
+      %{model: request.model, max_tokens: request.max_tokens, request_metadata: request.metadata},
       fn -> request_next_message_core(request, http_client_opts) end
     )
   end
@@ -387,7 +390,8 @@ defmodule Anthropic do
     {result,
      %{
        input_tokens: response.usage["input_tokens"],
-       output_tokens: response.usage["output_tokens"]
+       output_tokens: response.usage["output_tokens"],
+       response_id: response.id
      }}
   end
 
@@ -473,7 +477,13 @@ defmodule Anthropic do
   end
 
   defp process_invocation(tool_name, args, %Request{} = request) do
-    case Enum.find(request.tools, &(&1 == tool_name)) do
+    :telemetry.span([:anthropic, :process_invocation], %{request_meta: request.metadata, tool_name: tool_name}, fn ->
+      process_invocation_core(tool_name, args, request)
+    end)
+  end
+
+  defp process_invocation_core(tool_name, args, %Request{} = request) do
+    result = case Enum.find(request.tools, &(&1 == tool_name)) do
       nil ->
         {:error, "Tool #{tool_name} not found"}
 
@@ -482,5 +492,6 @@ defmodule Anthropic do
         result = Anthropic.Tools.Utils.format_response(task, tool_name)
         {:ok, result, request}
     end
+    {result, %{}}
   end
 end

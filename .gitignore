@@ -26,3 +26,5 @@ anthropic-*.tar
 /tmp/
 
 .DS_Store
+
+.vscode
