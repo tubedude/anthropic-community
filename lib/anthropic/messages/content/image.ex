@@ -47,15 +47,7 @@ defmodule Anthropic.Messages.Content.Image do
   @type dimensions :: {integer, integer}
   @type supported_size :: {String.t(), dimensions}
   @type image_input :: binary | String.t()
-  @type process_output :: {:ok, response()} | {:error, String.t()}
-  @type response :: %{
-          type: String.t(),
-          source: %{
-            type: String.t(),
-            media_type: String.t(),
-            data: binary()
-          }
-        }
+  @type process_output :: {:ok, map()} | {:error, String.t()}
 
   @spec process_image(image_input(), input_type()) :: process_output()
   @doc """

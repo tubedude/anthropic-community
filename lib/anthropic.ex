@@ -226,10 +226,7 @@ defmodule Anthropic do
     add_message(%Request{} = request, :assistant, message)
   end
 
-  @spec add_user_image(
-          Anthropic.Messages.Request.t(),
-          {Anthropic.Messages.Content.Image.input_type(), binary()}
-        ) :: Anthropic.Messages.Request.t()
+
   @doc """
   Adds an image message to the request.
 
