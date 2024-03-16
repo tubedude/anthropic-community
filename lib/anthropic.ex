@@ -172,7 +172,7 @@ defmodule Anthropic do
     content_objects =
       content
       |> Enum.map(fn
-        message when is_binary(message) -> %{type: "text", text: message}
+        message when is_binary(message) -> %{"type" => "text", "text" => message}
         content_object -> content_object
       end)
 

@@ -1,3 +1,8 @@
+## 0.4.3 - 2024-03-15
+
+### Fixed
+- Fixed inconsistency in storing messages in `Anthropic.Request` 
+
 ## 0.4.2 - 2024-03-15
 
 ### Fixed
