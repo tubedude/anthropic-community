@@ -53,21 +53,21 @@ defmodule AnthropicTest do
         |> Anthropic.add_user_message("Message 2")
         |> Anthropic.add_user_message("Message 3")
 
-      assert List.first(request.messages).content == [%{type: "text", text: "Message 3"}]
+      assert List.first(request.messages).content == [%{"type" => "text", "text" => "Message 3"}]
       assert List.first(request.messages).role == :user
 
-      assert List.last(request.messages).content == [%{type: "text", text: "Message 1"}]
+      assert List.last(request.messages).content == [%{"type" => "text", "text" => "Message 1"}]
       assert List.last(request.messages).role == :user
     end
 
     test "appends a list of different messages" do
       request =
         Anthropic.new()
-        |> Anthropic.add_user_message(["Message 1", %{type: "text", content: ["Message 2"]}])
+        |> Anthropic.add_user_message(["Message 1", %{"type" => "text", content: ["Message 2"]}])
 
       assert List.last(request.messages).content == [
-               %{text: "Message 1", type: "text"},
-               %{type: "text", content: ["Message 2"]}
+               %{"text" => "Message 1", "type" => "text"},
+               %{"type" => "text", content: ["Message 2"]}
              ]
 
       assert List.last(request.messages).role == :user
@@ -82,7 +82,7 @@ defmodule AnthropicTest do
         |> Anthropic.add_assistant_message("And the reply is...")
 
       assert List.first(request.messages).content == [
-               %{type: "text", text: "And the reply is..."}
+               %{"type" => "text", "text" => "And the reply is..."}
              ]
 
       assert List.first(request.messages).role == :assistant
@@ -97,8 +97,8 @@ defmodule AnthropicTest do
         |> Anthropic.add_message(:assistant, "Hi there!")
 
       assert [
-               %{role: :assistant, content: [%{type: "text", text: "Hi there!"}]},
-               %{role: :user, content: [%{type: "text", text: "Hello"}]}
+               %{role: :assistant, content: [%{"type" => "text", "text" => "Hi there!"}]},
+               %{role: :user, content: [%{"type" => "text", "text" => "Hello"}]}
              ] = request.messages
     end
 
@@ -110,7 +110,7 @@ defmodule AnthropicTest do
       assert [
                %{
                  role: :user,
-                 content: [%{text: "Message 1", type: "text"}, %{text: "Message 2", type: "text"}]
+                 content: [%{"text" => "Message 1", "type" => "text"}, %{"text" => "Message 2", "type" => "text"}]
                }
              ] = request.messages
     end
@@ -135,9 +135,9 @@ defmodule AnthropicTest do
       response = %Anthropic.Messages.Response{
         content: [
           %{
-            text:
+            "text" =>
               "<function_calls><invoke><tool_name>AnthropicTest.MockTool</tool_name><parameters><param1>value1</param1><param2>value2</param2></parameters></invoke></function_calls>",
-            type: "text"
+            "type" => "text"
           }
         ],
         invocations: [{MockTool, [param1: "value1", param2: "value2"]}]
@@ -199,8 +199,8 @@ defmodule AnthropicTest do
                role: :user,
                content: [
                  %{
-                   type: "image",
-                   source: %{data: _data, type: "base64", media_type: "image/png"}
+                   "type" => "image",
+                   "source" => %{"data" => _data, "type" => "base64", "media_type" => "image/png"}
                  }
                ]
              } = elem
@@ -247,7 +247,7 @@ defmodule AnthropicTest do
         {:ok,
          %Finch.Response{
            status: 400,
-           body: Jason.encode!(%{type: "error", message: "Authentication Error"})
+           body: Jason.encode!(%{"type" => "error", message: "Authentication Error"})
          }}
       end)
       |> expect(:build, fn method, url, headers, body, opts ->

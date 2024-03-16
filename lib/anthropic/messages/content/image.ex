@@ -128,11 +128,11 @@ defmodule Anthropic.Messages.Content.Image do
 
   defp build_response_object(mime_type, base64_data) do
     %{
-      type: "image",
-      source: %{
-        type: "base64",
-        media_type: mime_type,
-        data: base64_data
+      "type" => "image",
+      "source" => %{
+        "type" => "base64",
+        "media_type" => mime_type,
+        "data" => base64_data
       }
     }
   end
