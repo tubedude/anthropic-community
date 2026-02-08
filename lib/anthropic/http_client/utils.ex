@@ -7,6 +7,8 @@ defmodule Anthropic.HttpClient.Utils do
 
   alias Anthropic.Config
 
+  @user_agent "anthropic-community-elixir/#{Mix.Project.config()[:version]}"
+
   @doc """
   Builds the complete request URL from a base API URL and a specific path.
 
@@ -52,14 +54,16 @@ defmodule Anthropic.HttpClient.Utils do
       [
         {"x-api-key", "your_api_key"},
         {"anthropic-version", "2023-01"},
-        {"content-type", "application/json"}
+        {"content-type", "application/json"},
+        {"user-agent", "anthropic-community-elixir/0.4.3"}
       ]
   """
   def build_header(%Config{} = opts) do
     [
       {"x-api-key", opts.api_key},
       {"anthropic-version", opts.anthropic_version},
-      {"content-type", "application/json"}
+      {"content-type", "application/json"},
+      {"user-agent", @user_agent}
     ]
   end
 end
