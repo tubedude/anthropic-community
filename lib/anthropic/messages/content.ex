@@ -1,7 +1,7 @@
 defmodule Anthropic.Messages.Content do
   @moduledoc """
   Dispatches between the typed content-block structs (`Text`, `ToolUse`, `ToolResult`,
-  `Thinking`, `RedactedThinking`, `Image`) and their wire JSON shape.
+  `Thinking`, `RedactedThinking`, `Image`, `Document`) and their wire JSON shape.
 
   Response and request content blocks share the same struct types: a `%Text{}` decoded
   from a response round-trips through `to_json/1` unchanged if replayed into a later
@@ -13,7 +13,15 @@ defmodule Anthropic.Messages.Content do
   working — pattern-match on `%{"type" => ...}` alongside the typed structs to handle them.
   """
 
-  alias Anthropic.Messages.Content.{Text, ToolUse, ToolResult, Thinking, RedactedThinking, Image}
+  alias Anthropic.Messages.Content.{
+    Text,
+    ToolUse,
+    ToolResult,
+    Thinking,
+    RedactedThinking,
+    Image,
+    Document
+  }
 
   @type t ::
           Text.t()
@@ -22,6 +30,7 @@ defmodule Anthropic.Messages.Content do
           | Thinking.t()
           | RedactedThinking.t()
           | Image.t()
+          | Document.t()
 
   @spec from_json(map()) :: t() | map()
   def from_json(%{"type" => "text"} = b) do
@@ -100,7 +109,32 @@ defmodule Anthropic.Messages.Content do
     |> compact()
   end
 
+  def to_json(%Document{source_type: source_type} = doc) do
+    %{
+      type: "document",
+      source: document_source(source_type, doc),
+      cache_control: doc.cache_control,
+      citations: doc.citations,
+      context: doc.context,
+      title: doc.title
+    }
+    |> compact()
+  end
+
   def to_json(raw) when is_map(raw), do: raw
+
+  defp document_source("base64", %Document{media_type: media_type, data: data}) do
+    %{type: "base64", media_type: media_type, data: data}
+  end
+
+  defp document_source("url", %Document{url: url}), do: %{type: "url", url: url}
+
+  defp document_source("text", %Document{media_type: media_type, data: data}) do
+    %{type: "text", media_type: media_type, data: data}
+  end
+
+  defp document_source("content", %Document{content: content}),
+    do: %{type: "content", content: content}
 
   defp compact(map), do: Map.reject(map, fn {_k, v} -> is_nil(v) end)
 end

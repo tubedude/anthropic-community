@@ -123,6 +123,29 @@ defmodule Anthropic.Messages.RequestTest do
                Enum.at(params.messages, 0).content
     end
 
+    test "normalizes a Document content-block struct inside message content", %{client: client} do
+      doc = Anthropic.Messages.Content.Document.from_url("https://example.com/report.pdf")
+
+      assert {:ok, params} =
+               Request.build(
+                 client,
+                 [
+                   model: "claude-opus-4-8",
+                   max_tokens: 100,
+                   messages: [
+                     %{role: "user", content: [doc, %{type: "text", text: "Summarize."}]}
+                   ]
+                 ],
+                 stream: false
+               )
+
+      assert [
+               %{type: "document", source: %{type: "url", url: "https://example.com/report.pdf"}},
+               %{type: "text", text: "Summarize."}
+             ] =
+               Enum.at(params.messages, 0).content
+    end
+
     test "drops nil-valued keys from the final params", %{client: client} do
       assert {:ok, params} =
                Request.build(

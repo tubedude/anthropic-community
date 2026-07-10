@@ -200,6 +200,23 @@ Constrain Claude's response to a given JSON Schema:
   )
 ```
 
+### Documents (PDF/text)
+
+```elixir
+{:ok, doc} = Anthropic.Messages.Content.Document.process_document("/path/to/report.pdf", :path)
+
+{:ok, message} =
+  Anthropic.Messages.create(client,
+    model: "claude-opus-4-8",
+    max_tokens: 1024,
+    messages: [
+      %{role: "user", content: [doc, %{type: "text", text: "Summarize this document."}]}
+    ]
+  )
+```
+
+`Anthropic.Messages.Content.Document` also supports `from_url/2` (a hosted PDF), `from_text/2` (inline plain text), and `from_content/2` (pre-formatted content, for citing structured content rather than a raw document).
+
 ### Models
 
 ```elixir
