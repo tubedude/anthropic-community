@@ -6,7 +6,7 @@ defmodule Anthropic.Application do
   @doc false
   def start(_type, _args) do
     children = [
-      {Finch, name: Anthropic.HTTPClient.Engine}
+      {Finch, name: Anthropic.HTTPTransport.Engine}
     ]
 
     opts = [strategy: :one_for_one, name: Anthropic.Supervisor]

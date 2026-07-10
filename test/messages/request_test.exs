@@ -1,106 +1,142 @@
 defmodule Anthropic.Messages.RequestTest do
-  use ExUnit.Case
-  import Mox
+  use ExUnit.Case, async: true
 
-  setup :verify_on_exit!
+  alias Anthropic.Client
+  alias Anthropic.Messages.Request
+  alias Anthropic.Messages.Content.Image
 
-  describe "create/1" do
-    test "no options" do
-      assert %Anthropic.Messages.Request{model: "claude-3-haiku-20240307"} =
-               Anthropic.Messages.Request.create()
-    end
-
-    test "with options" do
-      assert %Anthropic.Messages.Request{max_tokens: 100} =
-               Anthropic.Messages.Request.create(max_tokens: 100)
-
-      assert %Anthropic.Messages.Request{top_k: 2} = Anthropic.Messages.Request.create(top_k: 2)
-    end
-
-    test "options precedent" do
-      Application.put_env(:anthropic, :model, "in_env")
-
-      assert %Anthropic.Messages.Request{model: "model"} =
-               Anthropic.Messages.Request.create(model: "model")
-
-      assert %Anthropic.Messages.Request{model: "in_env"} =
-               Anthropic.Messages.Request.create()
-
-      Application.put_env(:anthropic, :model, "claude-3-haiku-20240307")
-    end
+  setup do
+    {:ok, client: Client.new(api_key: "test-key")}
   end
 
-  describe "send_request/2" do
-    setup do
-      {:ok, [request: Anthropic.new()]}
+  describe "build/3" do
+    test "builds valid params", %{client: client} do
+      assert {:ok, params} =
+               Request.build(
+                 client,
+                 [
+                   model: "claude-opus-4-8",
+                   max_tokens: 100,
+                   messages: [%{role: "user", content: "Hi"}]
+                 ],
+                 stream: false
+               )
+
+      assert params.model == "claude-opus-4-8"
+      assert params.max_tokens == 100
+      assert params.stream == false
     end
 
-    test "with valid options returns a response", %{request: request} do
-      Anthropic.MockHTTPClient
-      |> expect(:request, fn _req, _client, _opts ->
-        {:ok,
-         %Finch.Response{
-           status: 200,
-           body:
-             "{\n  \"content\": [\n    {\n      \"text\": \"Hi! My name is Claude.\",\n      \"type\": \"text\"\n    }\n  ],\n  \"id\": \"msg_013Zva2CMHLNnXjNJJKqJ2EF\",\n  \"model\": \"claude-3-opus-20240229\",\n  \"role\": \"assistant\",\n  \"stop_reason\": \"end_turn\",\n  \"stop_sequence\": null,\n  \"type\": \"message\",\n  \"usage\": {\n    \"input_tokens\": 10,\n    \"output_tokens\": 25\n  }\n}\n"
-         }}
-      end)
-      |> expect(:build, fn method, url, headers, body, opts ->
-        Finch.build(method, url, headers, body, opts)
-      end)
+    test "uses client.default_model when :model is omitted", %{client: client} do
+      client = %{client | default_model: "claude-opus-4-8"}
 
-      assert {:ok, %Anthropic.Messages.Response{}} =
-               Anthropic.Messages.Request.send_request(request, [])
+      assert {:ok, %{model: "claude-opus-4-8"}} =
+               Request.build(
+                 client,
+                 [max_tokens: 100, messages: [%{role: "user", content: "Hi"}]],
+                 stream: false
+               )
     end
 
-    test "with bad json body", %{request: request} do
-      bad_body = " text\": \"I've tried \" "
-
-      Anthropic.MockHTTPClient
-      |> expect(:request, fn _req, _client, _opts ->
-        {:ok, %Finch.Response{status: 200, body: bad_body}}
-      end)
-      |> expect(:build, fn method, url, headers, body, opts ->
-        Finch.build(method, url, headers, body, opts)
-      end)
-
-      assert {:error,
-              %Jason.DecodeError{
-                __exception__: true,
-                data: " text\": \"I've tried \" ",
-                position: 1,
-                token: nil
-              }} =
-               Anthropic.Messages.Request.send_request(request, [])
+    test "sets stream: true when requested", %{client: client} do
+      assert {:ok, %{stream: true}} =
+               Request.build(
+                 client,
+                 [
+                   model: "claude-opus-4-8",
+                   max_tokens: 100,
+                   messages: [%{role: "user", content: "Hi"}]
+                 ],
+                 stream: true
+               )
     end
 
-    test "bad everything", %{request: request} do
-      Anthropic.MockHTTPClient
-      |> expect(:request, fn _req, _client, _opts ->
-        {:error, :very_bad}
-      end)
-      |> expect(:build, fn method, url, headers, body, opts ->
-        Finch.build(method, url, headers, body, opts)
-      end)
+    test "errors when model is missing", %{client: client} do
+      assert {:error, %Anthropic.Error{type: :validation_error, message: message}} =
+               Request.build(
+                 client,
+                 [max_tokens: 100, messages: [%{role: "user", content: "Hi"}]],
+                 stream: false
+               )
 
-      assert {:error, :very_bad} =
-               Anthropic.Messages.Request.send_request(request, [])
+      assert message =~ "model"
     end
-  end
 
-  describe "Jason.Encode implementation" do
-    test "should not print tool in system message if there are no tools" do
-      request =
-        Anthropic.new()
-      {:ok, encoded} = Jason.encode(request)
-      assert !(encoded =~ "<tool_name>$TOOL_NAME</tool_name>")
+    test "errors when max_tokens is missing", %{client: client} do
+      assert {:error, %Anthropic.Error{type: :validation_error, message: message}} =
+               Request.build(
+                 client,
+                 [model: "claude-opus-4-8", messages: [%{role: "user", content: "Hi"}]],
+                 stream: false
+               )
+
+      assert message =~ "max_tokens"
     end
-    test "should print tool in system message if there one or more tools" do
-      request =
-        Anthropic.new()
-        |> Anthropic.register_tool(AnthropicTest.MockTool)
-      {:ok, encoded} = Jason.encode(request)
-      assert encoded =~ "<tool_name>$TOOL_NAME</tool_name>"
+
+    test "errors when max_tokens is not a positive integer", %{client: client} do
+      assert {:error, %Anthropic.Error{type: :validation_error}} =
+               Request.build(
+                 client,
+                 [
+                   model: "claude-opus-4-8",
+                   max_tokens: 0,
+                   messages: [%{role: "user", content: "Hi"}]
+                 ],
+                 stream: false
+               )
+    end
+
+    test "errors when messages is missing or empty", %{client: client} do
+      assert {:error, %Anthropic.Error{type: :validation_error, message: message}} =
+               Request.build(client, [model: "claude-opus-4-8", max_tokens: 100], stream: false)
+
+      assert message =~ "messages"
+
+      assert {:error, %Anthropic.Error{type: :validation_error}} =
+               Request.build(client, [model: "claude-opus-4-8", max_tokens: 100, messages: []],
+                 stream: false
+               )
+    end
+
+    test "normalizes typed content-block structs inside message content into wire maps", %{
+      client: client
+    } do
+      {:ok, image} = Image.process_image("test/images/image.png", :path)
+
+      assert {:ok, params} =
+               Request.build(
+                 client,
+                 [
+                   model: "claude-opus-4-8",
+                   max_tokens: 100,
+                   messages: [
+                     %{role: "user", content: [image, %{type: "text", text: "What's this?"}]}
+                   ]
+                 ],
+                 stream: false
+               )
+
+      assert [
+               %{type: "image", source: %{type: "base64", media_type: "image/png"}},
+               %{type: "text", text: "What's this?"}
+             ] =
+               Enum.at(params.messages, 0).content
+    end
+
+    test "drops nil-valued keys from the final params", %{client: client} do
+      assert {:ok, params} =
+               Request.build(
+                 client,
+                 [
+                   model: "claude-opus-4-8",
+                   max_tokens: 100,
+                   messages: [%{role: "user", content: "Hi"}]
+                 ],
+                 stream: false
+               )
+
+      refute Map.has_key?(params, :system)
+      refute Map.has_key?(params, :tools)
     end
   end
 end

@@ -1,152 +1,88 @@
 defmodule Anthropic.Messages.Request do
   @moduledoc """
-  Defines the structure and functionality for creating and sending requests to the Anthropic API.
-
-  This module encapsulates the data needed for a request, including model specifications, messages, and various control parameters.
-  It also implements the `Jason.Encoder` protocol to serialize instances of this struct to JSON format for API requests.
-
-  Configuration options:
-  - `:model` - The name of the model to use for generating responses (default: "claude-3-opus-20240229").
-  - `:max_tokens` - The maximum number of tokens allowed in the generated response (default: 1000).
-  - `:temperature` - The sampling temperature for controlling response randomness (default: 1.0).
-  - `:top_p` - The cumulative probability threshold for nucleus sampling (default: 1.0).
-  - `:top_k` - The number of most probable next words considered at each step in sampling for text generation (default: nil).
+  Builds and validates the wire params for a `POST /v1/messages` request from a `Client` and
+  caller-supplied options. This is the single place where client defaults, call-site opts,
+  and wire-shape validation are merged for `Anthropic.Messages.create/2` and `stream/2`.
   """
 
-  @endpoint "/messages"
+  alias Anthropic.Client
+  alias Anthropic.Messages.Content
 
-  alias Anthropic.{HTTPClient}
-  alias Anthropic.HttpClient.Utils
+  @spec build(Client.t(), keyword() | map(), stream: boolean()) ::
+          {:ok, map()} | {:error, Anthropic.Error.t()}
+  def build(%Client{} = client, opts, stream: stream?) do
+    params =
+      opts
+      |> Map.new()
+      |> Map.put_new(:model, client.default_model)
+      |> Map.put(:stream, stream?)
 
-  @default [
-    model: "claude-3-opus-20240229",
-    max_tokens: 1000,
-    temperature: 1.0,
-    top_k: 1
-  ]
+    finish_build(params, require_max_tokens: true)
+  end
 
   @doc """
-  The structure of a request to the Anthropic API.
-
-  Includes all necessary fields for making a request, such as model information, messages to process, and parameters to control the behavior of the API response.
+  Like `build/3`, but for `POST /v1/messages/count_tokens`: same shape minus `max_tokens`
+  (not accepted by that endpoint) and without a `stream` field.
   """
-  defstruct model: nil,
-            messages: [],
-            system: nil,
-            max_tokens: nil,
-            metadata: nil,
-            stop_sequences: nil,
-            stream: false,
-            temperature: nil,
-            top_p: nil,
-            top_k: nil,
-            __config__: nil,
-            tools: MapSet.new()
+  @spec build_count_tokens(Client.t(), keyword() | map()) ::
+          {:ok, map()} | {:error, Anthropic.Error.t()}
+  def build_count_tokens(%Client{} = client, opts) do
+    params =
+      opts
+      |> Map.new()
+      |> Map.put_new(:model, client.default_model)
 
-  @type t :: %__MODULE__{
-          model: String.t() | nil,
-          messages: list(message()),
-          system: String.t() | nil,
-          max_tokens: integer() | nil,
-          metadata: map() | nil,
-          stop_sequences: list(String.t()) | nil,
-          stream: boolean(),
-          temperature: float() | nil,
-          top_p: float() | nil,
-          top_k: integer() | nil,
-          __config__: Anthropic.Config.t(),
-          tools: MapSet.t(atom())
-        }
+    finish_build(params, require_max_tokens: false)
+  end
 
-  @type message() :: %{
-          content: content_object(),
-          role: String.t()
-        }
+  defp finish_build(params, require_max_tokens: require_max_tokens?) do
+    case validate(params, require_max_tokens?) do
+      :ok ->
+        {:ok,
+         params
+         |> normalize_tools()
+         |> normalize_messages()
+         |> Map.reject(fn {_key, value} -> is_nil(value) end)}
 
-  @type content_object ::
-          %{type: String.t(), text: String.t()}
-          | %{
-              type: String.t(),
-              source: %{data: String.t(), type: String.t(), media_type: String.t()}
-            }
-
-  defimpl Jason.Encoder, for: Anthropic.Messages.Request do
-    def encode(req, opts) do
-      %{
-        messages: Enum.reverse(req.messages),
-        model: req.model,
-        system: Anthropic.Tools.Utils.decorate_tools_description(req.system, req.tools),
-        max_tokens: req.max_tokens,
-        metadata: req.metadata,
-        stop_sequences: req.stop_sequences,
-        stream: req.stream,
-        temperature: req.temperature,
-        top_p: req.top_p,
-        top_k: req.top_k
-      }
-      |> Map.reject(fn {_key, value} -> is_nil(value) end)
-      |> Jason.Encode.map(opts)
+      {:error, reason} ->
+        {:error, Anthropic.Error.validation(reason)}
     end
   end
 
-  @doc """
-  Creates a new request struct based on the provided configuration.
+  defp validate(params, require_max_tokens?) do
+    cond do
+      not is_binary(Map.get(params, :model)) or Map.get(params, :model) == "" ->
+        {:error, "model is required (pass :model or set Client.default_model)"}
 
-  Initializes a request with the parameters specified in the configuration, setting up default values for the request structure.
+      require_max_tokens? and
+          (not is_integer(Map.get(params, :max_tokens)) or Map.get(params, :max_tokens) <= 0) ->
+        {:error, "max_tokens is required and must be a positive integer"}
 
-  ## Parameters
-  - `opts`: Keyword list containing configuration options for the request.
+      not is_list(Map.get(params, :messages)) or Map.get(params, :messages) == [] ->
+        {:error, "messages must be a non-empty list"}
 
-  ## Returns
-  A new `Anthropic.Messages.Request` struct initialized with the provided configuration options.
-  """
-  def create(opts \\ []) do
-    @default
-    |> Keyword.merge(Anthropic.Config.build_system_configs(@default))
-    |> Keyword.merge(opts)
-    |> Anthropic.Config.validate_config()
-    |> then(&Keyword.put(&1, :__config__, Keyword.get(&1, :config)))
-    |> then(&struct(__MODULE__, &1))
-  end
-
-  @doc """
-  Encodes the request to JSON and sends it to the Anthropic API via the Finch HTTP client.
-
-  This function serializes the request struct into JSON, builds the request with the correct headers and path, and sends it using Finch.
-
-  ## Parameters
-
-  - `request`: The Anthropic.Messages.Request struct to send.
-  - `opts`: Additional options for the Finch request.
-
-  ## Returns
-
-  - `{:ok, response}` on successful request and response parsing.
-  - `{:error, reason}` if the request fails due to encoding issues or HTTP errors.
-  """
-  def send_request(%__MODULE__{} = request, opts) do
-    with {:ok, body} <- Jason.encode(request),
-         {:ok, response} <- build_httpclient_request(request, body, opts) do
-      {:ok, response}
-    else
-      {:error, %Jason.DecodeError{} = error} -> {:error, error}
-      {:error, %Finch.Error{} = error} -> {:error, error}
-      {:error, _} = error -> error
+      true ->
+        :ok
     end
-    |> Anthropic.Messages.Response.parse(request)
   end
 
-  defp build_httpclient_request(request, body, opts) do
-    sys_opts = request.__config__
+  defp normalize_tools(%{tools: nil} = params), do: params
 
-    req =
-      HTTPClient.build(
-        :post,
-        Utils.build_path(@endpoint, sys_opts.api_url),
-        Utils.build_header(sys_opts),
-        body
-      )
-
-    HTTPClient.request(req, HTTPClient.Engine, opts)
+  defp normalize_tools(%{tools: tools} = params) when is_list(tools) do
+    %{params | tools: Enum.map(tools, &Anthropic.Tools.to_param/1)}
   end
+
+  defp normalize_tools(params), do: params
+
+  defp normalize_messages(%{messages: messages} = params) when is_list(messages) do
+    %{params | messages: Enum.map(messages, &normalize_message/1)}
+  end
+
+  defp normalize_messages(params), do: params
+
+  defp normalize_message(%{content: content} = message) when is_list(content) do
+    %{message | content: Enum.map(content, &Content.to_json/1)}
+  end
+
+  defp normalize_message(%{} = message), do: message
 end

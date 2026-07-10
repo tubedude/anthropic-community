@@ -1,3 +1,21 @@
+## 0.5.0 - 2026-07-10
+
+Complete rewrite into an official-SDK-style client. Breaking change across the entire public API — no compatibility shims.
+
+### Added
+- `Anthropic.Client` struct (`Client.new/1`), replacing `Anthropic.Config` and the implicit pipeline configuration.
+- Typed content blocks: `Anthropic.Messages.Content.{Text, ToolUse, ToolResult, Thinking, RedactedThinking, Image}`.
+- Native tool use via the API's real `tools`/`tool_use`/`tool_result` protocol. `Anthropic.Tools` (JSON Schema `input_schema/0`) replaces `Anthropic.Tools.ToolBehaviour`. `Anthropic.ToolRunner.run/4` drives the full agentic loop, replacing the hand-rolled XML-in-system-prompt hack.
+- Streaming: `Anthropic.Messages.stream/2` returns a lazy `Stream` of typed `Anthropic.Messages.StreamEvent` structs; `Anthropic.Messages.stream_to_message/1` folds a stream into a final `Message`.
+- `Anthropic.Messages.count_tokens/2` (`POST /v1/messages/count_tokens`).
+- `Anthropic.Error` — a unified error struct/exception mirroring the API's error taxonomy, with `retryable?/1`.
+- Automatic retries with exponential backoff (capped at 8s) and jitter on `408`/`409`/`429`/`5xx`, honoring `retry-after-ms`/`retry-after` and a server-sent `x-should-retry` override, shared by `create/2`, `stream/2`, and `count_tokens/2`.
+- `Anthropic.Models` and `Anthropic.Batches` resources, including `Batches.delete/2` and cursor-based auto-pagination (`Models.list_all/2`, `Batches.list_all/2` — lazy `Stream`s that transparently walk pages via `after_id`/`last_id`, backed by the new `Anthropic.Pagination` helper).
+
+### Removed
+- `Anthropic` pipeline API (`new/1`, `add_user_message/2`, `request_next_message/1`, `process_invocations/1`, etc).
+- `Anthropic.Config`, `Anthropic.Messages.Request`/`Response` (old pipeline versions), `Anthropic.HTTPClient`, `Anthropic.Tools.ToolBehaviour`, `Anthropic.Tools.Utils` (XML tool-calling).
+
 ## 0.4.3 - 2024-03-15
 
 ### Fixed

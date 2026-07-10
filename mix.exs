@@ -2,13 +2,14 @@ defmodule Anthropic.MixProject do
   use Mix.Project
 
   @name "anthropic_community"
-  @version "0.4.3"
+  @version "0.5.0"
   @repo_url "https://github.com/tubedude/anthropic-community"
 
   def project do
     [
       app: :anthropic,
-      description: "Unofficial Anthropic API wrapper.",
+      description:
+        "Elixir client for the Anthropic Messages API — typed content blocks, native tool use, streaming, retries.",
       name: @name,
       source_url: @repo_url,
       version: @version,
@@ -30,11 +31,11 @@ defmodule Anthropic.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:finch, "~> 0.13"},
-      {:jason, "~> 1.0"},
+      {:finch, "~> 0.18"},
+      {:jason, "~> 1.4"},
       {:ex_image_info, "~> 0.2.4"},
-      {:telemetry, "~> 1.0"},
-      {:mox, "~> 1.1.0", only: :test},
+      {:telemetry, "~> 1.2"},
+      {:mox, "~> 1.1", only: :test},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
