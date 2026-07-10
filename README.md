@@ -133,6 +133,58 @@ Then drive the full agentic loop with `Anthropic.ToolRunner`:
 
 `ToolRunner` executes every requested tool, feeds results back to the API, and repeats until the assistant stops requesting tools.
 
+### Prompt caching
+
+Attach `Anthropic.CacheControl.ephemeral/1` to a content block's `:cache_control` field to mark it as a cache breakpoint:
+
+```elixir
+{:ok, message} =
+  Anthropic.Messages.create(client,
+    model: "claude-opus-4-8",
+    max_tokens: 1024,
+    messages: [
+      %{
+        role: "user",
+        content: [
+          %Anthropic.Messages.Content.Text{text: large_document, cache_control: Anthropic.CacheControl.ephemeral()},
+          %{type: "text", text: "Summarize the above."}
+        ]
+      }
+    ]
+  )
+```
+
+### Extended thinking
+
+```elixir
+{:ok, message} =
+  Anthropic.Messages.create(client,
+    model: "claude-opus-4-8",
+    max_tokens: 4096,
+    thinking: Anthropic.Thinking.enabled(budget_tokens: 10_000),
+    messages: [%{role: "user", content: "..."}]
+  )
+```
+
+### Structured outputs
+
+Constrain Claude's response to a given JSON Schema:
+
+```elixir
+{:ok, message} =
+  Anthropic.Messages.create(client,
+    model: "claude-opus-4-8",
+    max_tokens: 1024,
+    output_config:
+      Anthropic.OutputConfig.json_schema(%{
+        "type" => "object",
+        "properties" => %{"answer" => %{"type" => "string"}},
+        "required" => ["answer"]
+      }),
+    messages: [%{role: "user", content: "..."}]
+  )
+```
+
 ### Images
 
 ```elixir

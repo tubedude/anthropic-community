@@ -15,6 +15,8 @@ defmodule Anthropic.Messages do
           system: String.t() | list(map()) | nil,
           tools: list(module() | map()) | nil,
           tool_choice: map() | nil,
+          thinking: map() | nil,
+          output_config: map() | nil,
           temperature: float() | nil,
           top_p: float() | nil,
           top_k: pos_integer() | nil,

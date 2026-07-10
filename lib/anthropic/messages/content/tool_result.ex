@@ -5,11 +5,12 @@ defmodule Anthropic.Messages.Content.ToolResult do
   `Anthropic.Messages.Content.ToolUse` block the assistant requested.
   """
 
-  defstruct [:tool_use_id, :content, is_error: false]
+  defstruct [:tool_use_id, :content, :cache_control, is_error: false]
 
   @type t :: %__MODULE__{
           tool_use_id: String.t(),
           content: String.t() | list(map()),
-          is_error: boolean()
+          is_error: boolean(),
+          cache_control: map() | nil
         }
 end

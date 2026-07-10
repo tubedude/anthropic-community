@@ -25,18 +25,19 @@ defmodule Anthropic.Messages.Content do
 
   @spec from_json(map()) :: t() | map()
   def from_json(%{"type" => "text"} = b) do
-    %Text{text: b["text"], citations: b["citations"]}
+    %Text{text: b["text"], citations: b["citations"], cache_control: b["cache_control"]}
   end
 
   def from_json(%{"type" => "tool_use"} = b) do
-    %ToolUse{id: b["id"], name: b["name"], input: b["input"]}
+    %ToolUse{id: b["id"], name: b["name"], input: b["input"], cache_control: b["cache_control"]}
   end
 
   def from_json(%{"type" => "tool_result"} = b) do
     %ToolResult{
       tool_use_id: b["tool_use_id"],
       content: b["content"],
-      is_error: b["is_error"] || false
+      is_error: b["is_error"] || false,
+      cache_control: b["cache_control"]
     }
   end
 
@@ -52,16 +53,29 @@ defmodule Anthropic.Messages.Content do
 
   @doc "Encodes a content-block struct (or a plain map, passed through unchanged) back to its wire shape."
   @spec to_json(t() | map()) :: map()
-  def to_json(%Text{text: text, citations: citations}) do
-    %{type: "text", text: text, citations: citations} |> compact()
+  def to_json(%Text{text: text, citations: citations, cache_control: cache_control}) do
+    %{type: "text", text: text, citations: citations, cache_control: cache_control} |> compact()
   end
 
-  def to_json(%ToolUse{id: id, name: name, input: input}) do
-    %{type: "tool_use", id: id, name: name, input: input}
+  def to_json(%ToolUse{id: id, name: name, input: input, cache_control: cache_control}) do
+    %{type: "tool_use", id: id, name: name, input: input, cache_control: cache_control}
+    |> compact()
   end
 
-  def to_json(%ToolResult{tool_use_id: id, content: content, is_error: is_error}) do
-    %{type: "tool_result", tool_use_id: id, content: content, is_error: is_error}
+  def to_json(%ToolResult{
+        tool_use_id: id,
+        content: content,
+        is_error: is_error,
+        cache_control: cache_control
+      }) do
+    %{
+      type: "tool_result",
+      tool_use_id: id,
+      content: content,
+      is_error: is_error,
+      cache_control: cache_control
+    }
+    |> compact()
   end
 
   def to_json(%Thinking{thinking: thinking, signature: signature}) do
@@ -72,8 +86,18 @@ defmodule Anthropic.Messages.Content do
     %{type: "redacted_thinking", data: data}
   end
 
-  def to_json(%Image{media_type: media_type, data: data, source_type: source_type}) do
-    %{type: "image", source: %{type: source_type, media_type: media_type, data: data}}
+  def to_json(%Image{
+        media_type: media_type,
+        data: data,
+        source_type: source_type,
+        cache_control: cache_control
+      }) do
+    %{
+      type: "image",
+      source: %{type: source_type, media_type: media_type, data: data},
+      cache_control: cache_control
+    }
+    |> compact()
   end
 
   def to_json(raw) when is_map(raw), do: raw

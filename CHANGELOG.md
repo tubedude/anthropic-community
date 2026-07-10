@@ -11,6 +11,10 @@ Complete rewrite into an official-SDK-style client. Breaking change across the e
 - `Anthropic.Error` — a unified error struct/exception mirroring the API's error taxonomy, with `retryable?/1`.
 - Automatic retries with exponential backoff (capped at 8s) and jitter on `408`/`409`/`429`/`5xx`, honoring `retry-after-ms`/`retry-after` and a server-sent `x-should-retry` override, shared by `create/2`, `stream/2`, and `count_tokens/2`.
 - `Anthropic.Models` and `Anthropic.Batches` resources, including `Batches.delete/2` and cursor-based auto-pagination (`Models.list_all/2`, `Batches.list_all/2` — lazy `Stream`s that transparently walk pages via `after_id`/`last_id`, backed by the new `Anthropic.Pagination` helper).
+- Prompt caching: `Anthropic.CacheControl.ephemeral/1` builds a `cache_control` map; attach it to a `Text`/`Image`/`ToolUse`/`ToolResult` content block's `:cache_control` field.
+- Extended thinking request config: `Anthropic.Thinking.enabled/1`, `.adaptive/1`, `.disabled/0` build a `:thinking` param for `Messages.create/2`/`stream/2`.
+- Structured outputs: `Anthropic.OutputConfig.json_schema/2` builds an `:output_config` param constraining the response to a given JSON Schema.
+- Added `nimble_options` as a dependency, used to validate `CacheControl`/`Thinking`/`OutputConfig` option shapes with clear error messages.
 
 ### Removed
 - `Anthropic` pipeline API (`new/1`, `add_user_message/2`, `request_next_message/1`, `process_invocations/1`, etc).

@@ -47,6 +47,15 @@ defmodule Anthropic.Messages.ContentTest do
       raw = %{"type" => "server_tool_use", "id" => "x"}
       assert Content.from_json(raw) == raw
     end
+
+    test "decodes cache_control when present" do
+      assert %Text{cache_control: %{"type" => "ephemeral"}} =
+               Content.from_json(%{
+                 "type" => "text",
+                 "text" => "hi",
+                 "cache_control" => %{"type" => "ephemeral"}
+               })
+    end
   end
 
   describe "to_json/1 round-trip" do

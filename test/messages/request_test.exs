@@ -138,5 +138,62 @@ defmodule Anthropic.Messages.RequestTest do
       refute Map.has_key?(params, :system)
       refute Map.has_key?(params, :tools)
     end
+
+    test "passes a :thinking option straight through to the wire params", %{client: client} do
+      assert {:ok, %{thinking: %{type: "enabled", budget_tokens: 10_000}}} =
+               Request.build(
+                 client,
+                 [
+                   model: "claude-opus-4-8",
+                   max_tokens: 100,
+                   messages: [%{role: "user", content: "Hi"}],
+                   thinking: Anthropic.Thinking.enabled(budget_tokens: 10_000)
+                 ],
+                 stream: false
+               )
+    end
+
+    test "passes an :output_config option straight through to the wire params", %{client: client} do
+      output_config = Anthropic.OutputConfig.json_schema(%{"type" => "object"}, effort: "high")
+
+      assert {:ok, %{output_config: ^output_config}} =
+               Request.build(
+                 client,
+                 [
+                   model: "claude-opus-4-8",
+                   max_tokens: 100,
+                   messages: [%{role: "user", content: "Hi"}],
+                   output_config: output_config
+                 ],
+                 stream: false
+               )
+    end
+
+    test "propagates cache_control on a content-block struct into the normalized wire params",
+         %{client: client} do
+      assert {:ok, params} =
+               Request.build(
+                 client,
+                 [
+                   model: "claude-opus-4-8",
+                   max_tokens: 100,
+                   messages: [
+                     %{
+                       role: "user",
+                       content: [
+                         %Anthropic.Messages.Content.Text{
+                           text: "Big context",
+                           cache_control: Anthropic.CacheControl.ephemeral()
+                         }
+                       ]
+                     }
+                   ]
+                 ],
+                 stream: false
+               )
+
+      assert [%{type: "text", text: "Big context", cache_control: %{type: "ephemeral"}}] =
+               Enum.at(params.messages, 0).content
+    end
   end
 end

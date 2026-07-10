@@ -34,9 +34,14 @@ defmodule Anthropic.Messages.Content.Image do
   - `:base64` - A base64 encoded string of the image.
   """
 
-  defstruct [:media_type, :data, source_type: "base64"]
+  defstruct [:media_type, :data, :cache_control, source_type: "base64"]
 
-  @type t :: %__MODULE__{media_type: String.t(), data: String.t(), source_type: String.t()}
+  @type t :: %__MODULE__{
+          media_type: String.t(),
+          data: String.t(),
+          source_type: String.t(),
+          cache_control: map() | nil
+        }
 
   @supported_types ["image/jpeg", "image/png", "image/gif", "image/webp"]
   @supported_sizes [
