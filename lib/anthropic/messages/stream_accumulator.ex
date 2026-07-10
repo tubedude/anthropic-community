@@ -21,7 +21,7 @@ defmodule Anthropic.Messages.StreamAccumulator do
   defp fold(%SE.MessageStart{message: partial}, {_msg, _blocks}), do: {:cont, {partial, %{}}}
 
   defp fold(%SE.ContentBlockStart{index: index, content_block: block}, {msg, blocks}) do
-    entry = %{block: block, raw_json: if(match?(%Content.ToolUse{}, block), do: "", else: nil)}
+    entry = %{block: block, raw_json: if(json_input_block?(block), do: "", else: nil)}
     {:cont, {msg, Map.put(blocks, index, entry)}}
   end
 
@@ -83,8 +83,7 @@ defmodule Anthropic.Messages.StreamAccumulator do
     |> Enum.map(fn {_index, entry} -> finalize_block(entry) end)
   end
 
-  defp finalize_block(%{block: %Content.ToolUse{} = block, raw_json: raw_json})
-       when is_binary(raw_json) do
+  defp finalize_block(%{block: block, raw_json: raw_json}) when is_binary(raw_json) do
     input =
       case Jason.decode(raw_json) do
         {:ok, decoded} -> decoded
@@ -95,4 +94,12 @@ defmodule Anthropic.Messages.StreamAccumulator do
   end
 
   defp finalize_block(%{block: block}), do: block
+
+  # Content-block types whose `input` arrives as streamed `input_json_delta` JSON-string
+  # fragments (rather than as a complete map up front) and so need the raw_json buffer
+  # above — both native client tool calls and server-executed tool calls (web_search,
+  # code_execution, ...) use this same delta protocol.
+  defp json_input_block?(%Content.ToolUse{}), do: true
+  defp json_input_block?(%Content.ServerToolUse{}), do: true
+  defp json_input_block?(_block), do: false
 end

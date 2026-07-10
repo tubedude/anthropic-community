@@ -112,6 +112,38 @@ defmodule Anthropic.Messages.StreamAccumulatorTest do
                StreamAccumulator.accumulate(events)
     end
 
+    test "accumulates split input_json_delta fragments into a parsed server_tool_use input" do
+      events = [
+        %SE.MessageStart{message: base_message()},
+        %SE.ContentBlockStart{
+          index: 0,
+          content_block: %Content.ServerToolUse{id: "srvtoolu_1", name: "web_search", input: %{}}
+        },
+        %SE.ContentBlockDelta{
+          index: 0,
+          delta: %{"type" => "input_json_delta", "partial_json" => "{\"que"}
+        },
+        %SE.ContentBlockDelta{
+          index: 0,
+          delta: %{"type" => "input_json_delta", "partial_json" => "ry\":\"elixir\"}"}
+        },
+        %SE.ContentBlockStop{index: 0},
+        %SE.MessageDelta{delta: %{"stop_reason" => "end_turn"}, usage: %{"output_tokens" => 8}},
+        %SE.MessageStop{}
+      ]
+
+      assert {:ok, message} = StreamAccumulator.accumulate(events)
+
+      assert message.content == [
+               %Content.ServerToolUse{
+                 id: "srvtoolu_1",
+                 name: "web_search",
+                 input: %{"query" => "elixir"},
+                 caller: nil
+               }
+             ]
+    end
+
     test "malformed accumulated JSON for a tool_use input falls back to an empty map" do
       events = [
         %SE.MessageStart{message: base_message()},
