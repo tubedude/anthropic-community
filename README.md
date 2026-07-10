@@ -133,6 +133,28 @@ Then drive the full agentic loop with `Anthropic.ToolRunner`:
 
 `ToolRunner` executes every requested tool, feeds results back to the API, and repeats until the assistant stops requesting tools.
 
+### Server tools
+
+Web search, web fetch, code execution, bash, text editor, and memory are executed by Anthropic server-side — no `execute/1` to implement, just add the tool definition and read the typed result block back:
+
+```elixir
+{:ok, message} =
+  Anthropic.Messages.create(client,
+    model: "claude-opus-4-8",
+    max_tokens: 1024,
+    tools: [Anthropic.Tools.WebSearch.new(max_uses: 3)],
+    messages: [%{role: "user", content: "What's the latest Elixir release?"}]
+  )
+
+for %Anthropic.Messages.Content.WebSearchToolResult{content: results} <- message.content do
+  IO.inspect(results)
+end
+```
+
+Available: `Anthropic.Tools.WebSearch`, `WebFetch`, `CodeExecution`, `Bash`, `TextEditor`, `Memory` — each a thin, validated builder around that tool's versioned wire shape (`version:` defaults to the latest known version, override to pin an older one). Results decode into `Anthropic.Messages.Content.WebSearchToolResult`, `WebFetchToolResult`, `CodeExecutionToolResult`, `BashCodeExecutionToolResult`, `TextEditorCodeExecutionToolResult` — `content` on each is the raw decoded JSON payload (not deeply typed; see each tool's docs for its shape). The invocation itself decodes as `Anthropic.Messages.Content.ServerToolUse`, distinct from `ToolUse` so `Anthropic.ToolRunner` never tries to dispatch it to a client-side tool.
+
+Computer use and the MCP connector are beta-only and not yet supported.
+
 ### Prompt caching
 
 Attach `Anthropic.CacheControl.ephemeral/1` to a content block's `:cache_control` field to mark it as a cache breakpoint:

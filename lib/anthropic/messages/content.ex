@@ -1,16 +1,18 @@
 defmodule Anthropic.Messages.Content do
   @moduledoc """
   Dispatches between the typed content-block structs (`Text`, `ToolUse`, `ToolResult`,
-  `Thinking`, `RedactedThinking`, `Image`, `Document`) and their wire JSON shape.
+  `Thinking`, `RedactedThinking`, `Image`, `Document`, `ServerToolUse`, and the
+  `*ToolResult` server-tool-result blocks) and their wire JSON shape.
 
   Response and request content blocks share the same struct types: a `%Text{}` decoded
   from a response round-trips through `to_json/1` unchanged if replayed into a later
   request (e.g. in a tool-use loop), so there is no separate request-param/response-type
   split to maintain.
 
-  Content-block types the API adds in the future (e.g. server-side tool blocks) decode as
-  plain maps rather than raising, so callers on an older version of this library keep
-  working — pattern-match on `%{"type" => ...}` alongside the typed structs to handle them.
+  Content-block types the API adds in the future (e.g. computer-use/MCP tool-result blocks,
+  not yet modeled here) decode as plain maps rather than raising, so callers on an older
+  version of this library keep working — pattern-match on `%{"type" => ...}` alongside the
+  typed structs to handle them.
   """
 
   alias Anthropic.Messages.Content.{
@@ -21,7 +23,13 @@ defmodule Anthropic.Messages.Content do
     RedactedThinking,
     Image,
     Document,
-    Citation
+    Citation,
+    ServerToolUse,
+    WebSearchToolResult,
+    WebFetchToolResult,
+    CodeExecutionToolResult,
+    BashCodeExecutionToolResult,
+    TextEditorCodeExecutionToolResult
   }
 
   @type t ::
@@ -32,6 +40,12 @@ defmodule Anthropic.Messages.Content do
           | RedactedThinking.t()
           | Image.t()
           | Document.t()
+          | ServerToolUse.t()
+          | WebSearchToolResult.t()
+          | WebFetchToolResult.t()
+          | CodeExecutionToolResult.t()
+          | BashCodeExecutionToolResult.t()
+          | TextEditorCodeExecutionToolResult.t()
 
   @spec from_json(map()) :: t() | map()
   def from_json(%{"type" => "text"} = b) do
@@ -61,6 +75,34 @@ defmodule Anthropic.Messages.Content do
 
   def from_json(%{"type" => "redacted_thinking"} = b) do
     %RedactedThinking{data: b["data"]}
+  end
+
+  def from_json(%{"type" => "server_tool_use"} = b) do
+    %ServerToolUse{id: b["id"], name: b["name"], input: b["input"], caller: b["caller"]}
+  end
+
+  def from_json(%{"type" => "web_search_tool_result"} = b) do
+    %WebSearchToolResult{
+      tool_use_id: b["tool_use_id"],
+      content: b["content"],
+      caller: b["caller"]
+    }
+  end
+
+  def from_json(%{"type" => "web_fetch_tool_result"} = b) do
+    %WebFetchToolResult{tool_use_id: b["tool_use_id"], content: b["content"], caller: b["caller"]}
+  end
+
+  def from_json(%{"type" => "code_execution_tool_result"} = b) do
+    %CodeExecutionToolResult{tool_use_id: b["tool_use_id"], content: b["content"]}
+  end
+
+  def from_json(%{"type" => "bash_code_execution_tool_result"} = b) do
+    %BashCodeExecutionToolResult{tool_use_id: b["tool_use_id"], content: b["content"]}
+  end
+
+  def from_json(%{"type" => "text_editor_code_execution_tool_result"} = b) do
+    %TextEditorCodeExecutionToolResult{tool_use_id: b["tool_use_id"], content: b["content"]}
   end
 
   def from_json(raw) when is_map(raw), do: raw
@@ -104,6 +146,32 @@ defmodule Anthropic.Messages.Content do
 
   def to_json(%RedactedThinking{data: data}) do
     %{type: "redacted_thinking", data: data}
+  end
+
+  def to_json(%ServerToolUse{id: id, name: name, input: input, caller: caller}) do
+    %{type: "server_tool_use", id: id, name: name, input: input, caller: caller} |> compact()
+  end
+
+  def to_json(%WebSearchToolResult{tool_use_id: id, content: content, caller: caller}) do
+    %{type: "web_search_tool_result", tool_use_id: id, content: content, caller: caller}
+    |> compact()
+  end
+
+  def to_json(%WebFetchToolResult{tool_use_id: id, content: content, caller: caller}) do
+    %{type: "web_fetch_tool_result", tool_use_id: id, content: content, caller: caller}
+    |> compact()
+  end
+
+  def to_json(%CodeExecutionToolResult{tool_use_id: id, content: content}) do
+    %{type: "code_execution_tool_result", tool_use_id: id, content: content}
+  end
+
+  def to_json(%BashCodeExecutionToolResult{tool_use_id: id, content: content}) do
+    %{type: "bash_code_execution_tool_result", tool_use_id: id, content: content}
+  end
+
+  def to_json(%TextEditorCodeExecutionToolResult{tool_use_id: id, content: content}) do
+    %{type: "text_editor_code_execution_tool_result", tool_use_id: id, content: content}
   end
 
   def to_json(%Image{

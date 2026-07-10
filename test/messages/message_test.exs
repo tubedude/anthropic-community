@@ -71,5 +71,26 @@ defmodule Anthropic.Messages.MessageTest do
       refute Message.tool_use?(message)
       assert [] == Message.tool_uses(message)
     end
+
+    test "tool_uses/1 ignores server_tool_use blocks — ToolRunner must never try to dispatch them" do
+      body = %{
+        @raw_body
+        | "content" => [
+            %{
+              "type" => "server_tool_use",
+              "id" => "srvtoolu_1",
+              "name" => "web_search",
+              "input" => %{"query" => "elixir"}
+            },
+            %{"type" => "web_search_tool_result", "tool_use_id" => "srvtoolu_1", "content" => []},
+            %{"type" => "text", "text" => "Elixir 1.20 was released recently."}
+          ]
+      }
+
+      message = Message.from_json(body)
+
+      refute Message.tool_use?(message)
+      assert [] == Message.tool_uses(message)
+    end
   end
 end

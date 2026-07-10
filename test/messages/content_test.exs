@@ -5,6 +5,15 @@ defmodule Anthropic.Messages.ContentTest do
   alias Anthropic.Messages.Content.{Text, ToolUse, ToolResult, Thinking, RedactedThinking}
   alias Anthropic.Messages.Content.Citation.CharLocation
 
+  alias Anthropic.Messages.Content.{
+    ServerToolUse,
+    WebSearchToolResult,
+    WebFetchToolResult,
+    CodeExecutionToolResult,
+    BashCodeExecutionToolResult,
+    TextEditorCodeExecutionToolResult
+  }
+
   describe "from_json/1" do
     test "decodes a text block" do
       assert %Text{text: "hi", citations: nil} =
@@ -45,8 +54,72 @@ defmodule Anthropic.Messages.ContentTest do
     end
 
     test "passes unknown block types through as a raw map" do
-      raw = %{"type" => "server_tool_use", "id" => "x"}
+      raw = %{"type" => "computer_tool_use", "id" => "x"}
       assert Content.from_json(raw) == raw
+    end
+
+    test "decodes a server_tool_use block" do
+      assert %ServerToolUse{id: "srvtoolu_1", name: "web_search", input: %{"query" => "elixir"}} =
+               Content.from_json(%{
+                 "type" => "server_tool_use",
+                 "id" => "srvtoolu_1",
+                 "name" => "web_search",
+                 "input" => %{"query" => "elixir"}
+               })
+    end
+
+    test "decodes a web_search_tool_result block" do
+      assert %WebSearchToolResult{
+               tool_use_id: "srvtoolu_1",
+               content: [%{"type" => "web_search_result"}]
+             } =
+               Content.from_json(%{
+                 "type" => "web_search_tool_result",
+                 "tool_use_id" => "srvtoolu_1",
+                 "content" => [%{"type" => "web_search_result"}]
+               })
+    end
+
+    test "decodes a web_fetch_tool_result block" do
+      assert %WebFetchToolResult{
+               tool_use_id: "srvtoolu_1",
+               content: %{"type" => "web_fetch_result"}
+             } =
+               Content.from_json(%{
+                 "type" => "web_fetch_tool_result",
+                 "tool_use_id" => "srvtoolu_1",
+                 "content" => %{"type" => "web_fetch_result"}
+               })
+    end
+
+    test "decodes a code_execution_tool_result block" do
+      assert %CodeExecutionToolResult{tool_use_id: "srvtoolu_1", content: %{"stdout" => "42"}} =
+               Content.from_json(%{
+                 "type" => "code_execution_tool_result",
+                 "tool_use_id" => "srvtoolu_1",
+                 "content" => %{"stdout" => "42"}
+               })
+    end
+
+    test "decodes a bash_code_execution_tool_result block" do
+      assert %BashCodeExecutionToolResult{tool_use_id: "srvtoolu_1", content: %{"stdout" => "ok"}} =
+               Content.from_json(%{
+                 "type" => "bash_code_execution_tool_result",
+                 "tool_use_id" => "srvtoolu_1",
+                 "content" => %{"stdout" => "ok"}
+               })
+    end
+
+    test "decodes a text_editor_code_execution_tool_result block" do
+      assert %TextEditorCodeExecutionToolResult{
+               tool_use_id: "srvtoolu_1",
+               content: %{"file_text" => "..."}
+             } =
+               Content.from_json(%{
+                 "type" => "text_editor_code_execution_tool_result",
+                 "tool_use_id" => "srvtoolu_1",
+                 "content" => %{"file_text" => "..."}
+               })
     end
 
     test "decodes cache_control when present" do
@@ -114,8 +187,42 @@ defmodule Anthropic.Messages.ContentTest do
     end
 
     test "unknown map passes through unchanged" do
-      raw = %{"type" => "server_tool_use"}
+      raw = %{"type" => "computer_tool_use"}
       assert Content.to_json(raw) == raw
+    end
+
+    test "server_tool_use" do
+      block = %ServerToolUse{id: "srvtoolu_1", name: "web_search", input: %{"query" => "elixir"}}
+
+      assert Content.to_json(block) == %{
+               type: "server_tool_use",
+               id: "srvtoolu_1",
+               name: "web_search",
+               input: %{"query" => "elixir"}
+             }
+    end
+
+    test "web_search_tool_result" do
+      block = %WebSearchToolResult{
+        tool_use_id: "srvtoolu_1",
+        content: [%{"type" => "web_search_result"}]
+      }
+
+      assert Content.to_json(block) == %{
+               type: "web_search_tool_result",
+               tool_use_id: "srvtoolu_1",
+               content: [%{"type" => "web_search_result"}]
+             }
+    end
+
+    test "code_execution_tool_result" do
+      block = %CodeExecutionToolResult{tool_use_id: "srvtoolu_1", content: %{"stdout" => "42"}}
+
+      assert Content.to_json(block) == %{
+               type: "code_execution_tool_result",
+               tool_use_id: "srvtoolu_1",
+               content: %{"stdout" => "42"}
+             }
     end
 
     test "re-encodes a text block's typed citations back to wire maps" do

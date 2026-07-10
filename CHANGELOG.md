@@ -16,7 +16,8 @@ Complete rewrite into an official-SDK-style client. Breaking change across the e
 - Structured outputs: `Anthropic.OutputConfig.json_schema/2` builds an `:output_config` param constraining the response to a given JSON Schema.
 - PDF/document content blocks: `Anthropic.Messages.Content.Document` — `process_document/3` (local PDF), `from_url/2`, `from_text/2`, `from_content/2`.
 - Citations: typed response-side citation structs (`Anthropic.Messages.Content.Citation.{CharLocation, PageLocation, ContentBlockLocation, SearchResultLocation, WebSearchResultLocation}`), decoded from a `Text` block's `:citations` list instead of raw maps and re-encoded correctly if replayed into a later request. Request-side config is the existing `citations: %{enabled: true}` option on `Document`.
-- Added `nimble_options` as a dependency, used to validate `CacheControl`/`Thinking`/`OutputConfig` option shapes with clear error messages.
+- Server tools (web search, web fetch, code execution, bash, text editor, memory) — executed by Anthropic server-side, no client `execute/1` needed: `Anthropic.Tools.{WebSearch, WebFetch, CodeExecution, Bash, TextEditor, Memory}` build each tool's versioned wire shape (`version:` defaults to latest, overridable). Results decode into `Anthropic.Messages.Content.{ServerToolUse, WebSearchToolResult, WebFetchToolResult, CodeExecutionToolResult, BashCodeExecutionToolResult, TextEditorCodeExecutionToolResult}` — `ServerToolUse` is distinct from `ToolUse` so `Anthropic.ToolRunner` never tries to dispatch a server-tool invocation to a client-side tool. Computer use and the MCP connector are beta-only and not yet supported.
+- Added `nimble_options` as a dependency, used to validate `CacheControl`/`Thinking`/`OutputConfig`/server-tool option shapes with clear error messages.
 
 ### Removed
 - `Anthropic` pipeline API (`new/1`, `add_user_message/2`, `request_next_message/1`, `process_invocations/1`, etc).
