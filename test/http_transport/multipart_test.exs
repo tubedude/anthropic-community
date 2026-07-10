@@ -64,5 +64,30 @@ defmodule Anthropic.HTTPTransport.MultipartTest do
       {boundary2, _} = Multipart.encode([{"a", "b"}])
       assert boundary1 != boundary2
     end
+
+    test "escapes a double quote in a filename so it can't break out of the quoted header param" do
+      {_boundary, body} = Multipart.encode([{"file", "data", filename: ~s(my"file.pdf)}])
+      encoded = IO.iodata_to_binary(body)
+
+      assert encoded =~ ~s(filename="my%22file.pdf")
+      refute encoded =~ ~s(filename="my"file.pdf")
+    end
+
+    test "strips CR/LF from a filename so it can't inject extra header lines" do
+      {_boundary, body} =
+        Multipart.encode([{"file", "data", filename: "evil\r\nContent-Type: text/html"}])
+
+      encoded = IO.iodata_to_binary(body)
+
+      assert encoded =~ ~s(filename="evilContent-Type: text/html")
+      refute encoded =~ "evil\r\nContent-Type"
+    end
+
+    test "escapes a double quote in a plain field name" do
+      {_boundary, body} = Multipart.encode([{~s(weird"name), "value"}])
+      encoded = IO.iodata_to_binary(body)
+
+      assert encoded =~ ~s(name="weird%22name")
+    end
   end
 end

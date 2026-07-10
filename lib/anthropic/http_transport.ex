@@ -73,8 +73,7 @@ defmodule Anthropic.HTTPTransport do
     {boundary, body} = Multipart.encode(fields)
     headers = [{"content-type", "multipart/form-data; boundary=#{boundary}"} | extra_headers]
 
-    with {:ok, raw_body} <-
-           send_raw(client, :post, client.base_url <> path, IO.iodata_to_binary(body), headers, 0) do
+    with {:ok, raw_body} <- send_raw(client, :post, client.base_url <> path, body, headers, 0) do
       decode_body(raw_body)
     end
   end
@@ -89,10 +88,16 @@ defmodule Anthropic.HTTPTransport do
     send_raw(client, :get, client.base_url <> path, nil, extra_headers, 0)
   end
 
-  # Shared by post_multipart/4 and get_binary/3: same retry policy as send_request/6, but
-  # skipping JSON decoding entirely (a multipart response is still JSON — Files.create
-  # returns FileMetadata — but a download response is arbitrary binary, so callers of this
-  # function decode JSON themselves when they know they need to).
+  # Shared by post_multipart/4, get/3, delete/3, and get_binary/3. Deliberately a separate
+  # orchestration from send_request/maybe_retry (not a shared call), to avoid touching that
+  # already-reviewed JSON+streaming path — it independently calls the same Retry module
+  # functions with the same arguments, so the *policy* is centralized even though the loop
+  # around it is duplicated. If you change retry behavior in maybe_retry/8, check whether
+  # maybe_retry_raw/8 below needs the identical change.
+  #
+  # Skips JSON decoding entirely here: a multipart response is still JSON (Files.create
+  # returns file metadata) but a download response is arbitrary binary, so callers decode
+  # JSON themselves via decode_body/1 when they know they need to.
   defp send_raw(client, method, url, body, headers, attempt) do
     req = Finch.build(method, url, base_headers(client) ++ headers, body)
 

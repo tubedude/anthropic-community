@@ -32,7 +32,7 @@ defmodule Anthropic.HTTPTransport.Multipart do
       boundary,
       "\r\n",
       "Content-Disposition: form-data; name=\"",
-      name,
+      escape_quoted_param(name),
       "\"\r\n\r\n",
       value,
       "\r\n"
@@ -48,9 +48,9 @@ defmodule Anthropic.HTTPTransport.Multipart do
       boundary,
       "\r\n",
       "Content-Disposition: form-data; name=\"",
-      name,
+      escape_quoted_param(name),
       "\"; filename=\"",
-      filename,
+      escape_quoted_param(filename),
       "\"\r\n",
       "Content-Type: ",
       content_type,
@@ -58,5 +58,15 @@ defmodule Anthropic.HTTPTransport.Multipart do
       data,
       "\r\n"
     ]
+  end
+
+  # RFC 7578 §4.2 quoted-string params (name/filename) don't allow a literal `"` or CR/LF —
+  # both would otherwise let a caller-supplied filename (e.g. Path.basename/1 of an
+  # attacker-influenced path) break out of the quoted param and corrupt the header.
+  defp escape_quoted_param(value) do
+    value
+    |> String.replace("\"", "%22")
+    |> String.replace("\r", "")
+    |> String.replace("\n", "")
   end
 end

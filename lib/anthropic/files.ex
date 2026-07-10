@@ -52,7 +52,8 @@ defmodule Anthropic.Files do
         upload(client, data, Path.basename(path), content_type)
 
       {:error, reason} ->
-        {:error, Error.new(:invalid_request_error, "Error reading file #{reason} path: #{path}")}
+        {:error,
+         Error.validation("could not read file at #{path}: #{:file.format_error(reason)}")}
     end
   end
 

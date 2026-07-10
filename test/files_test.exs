@@ -54,9 +54,12 @@ defmodule Anthropic.FilesTest do
                Files.create(client, "test/images/image.png")
     end
 
-    test "returns a validation-shaped error when the path doesn't exist", %{client: client} do
-      assert {:error, %Anthropic.Error{type: :invalid_request_error}} =
+    test "returns a client-local validation error (not a wire error type) when the path doesn't exist",
+         %{client: client} do
+      assert {:error, %Anthropic.Error{type: :validation_error, message: message}} =
                Files.create(client, "test/nofile.pdf")
+
+      assert message =~ "test/nofile.pdf"
     end
   end
 
