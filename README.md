@@ -297,6 +297,23 @@ client |> Anthropic.Batches.list_all() |> Enum.to_list()
 {:ok, _deleted} = Anthropic.Batches.delete(client, batch.id)
 ```
 
+### Files
+
+Upload a file once and reference it by `file_id` instead of inlining base64 data. This is a beta API — `Anthropic.Files` automatically sends the `anthropic-beta` header it currently requires:
+
+```elixir
+{:ok, file} = Anthropic.Files.create(client, "/path/to/report.pdf")
+
+{:ok, %{data: files}} = Anthropic.Files.list(client)
+client |> Anthropic.Files.list_all() |> Enum.to_list()
+
+{:ok, file} = Anthropic.Files.retrieve(client, file.id)
+{:ok, binary} = Anthropic.Files.download(client, file.id)
+{:ok, _deleted} = Anthropic.Files.delete(client, file.id)
+```
+
+Referencing the uploaded file back in a message is also beta and not yet modeled by `Content.Image`/`Document` — pass a raw map and add the same beta header to that call (see `Anthropic.Files` moduledoc for a full example).
+
 ### Counting tokens
 
 ```elixir

@@ -8,7 +8,7 @@ defmodule Anthropic.HTTPTransport do
   """
 
   alias Anthropic.{Client, Error}
-  alias Anthropic.HTTPTransport.Retry
+  alias Anthropic.HTTPTransport.{Retry, Multipart}
 
   @spec post(Client.t(), path :: String.t(), params :: map()) ::
           {:ok, map()} | {:error, Error.t()}
@@ -33,6 +33,90 @@ defmodule Anthropic.HTTPTransport do
   @spec delete(Client.t(), path :: String.t()) :: {:ok, map()} | {:error, Error.t()}
   def delete(%Client{} = client, path) do
     send_request(client, :delete, client.base_url <> path, nil, 0, decode: true)
+  end
+
+  @doc """
+  Like `get/2`, but accepts extra request-specific headers (e.g. the `anthropic-beta`
+  header `Anthropic.Files` requires) without touching `Client.default_headers`.
+  """
+  @spec get(Client.t(), path :: String.t(), list({String.t(), String.t()})) ::
+          {:ok, map()} | {:error, Error.t()}
+  def get(%Client{} = client, path, extra_headers) do
+    with {:ok, raw_body} <- send_raw(client, :get, client.base_url <> path, nil, extra_headers, 0) do
+      decode_body(raw_body)
+    end
+  end
+
+  @doc "Like `delete/2`, but accepts extra request-specific headers."
+  @spec delete(Client.t(), path :: String.t(), list({String.t(), String.t()})) ::
+          {:ok, map()} | {:error, Error.t()}
+  def delete(%Client{} = client, path, extra_headers) do
+    with {:ok, raw_body} <-
+           send_raw(client, :delete, client.base_url <> path, nil, extra_headers, 0) do
+      decode_body(raw_body)
+    end
+  end
+
+  @doc """
+  Sends a `multipart/form-data` POST (currently only used by `Anthropic.Files.create/2`).
+  `extra_headers` lets callers add request-specific headers (e.g. the `anthropic-beta`
+  header the Files API currently requires) without touching `Client.default_headers`.
+  """
+  @spec post_multipart(
+          Client.t(),
+          path :: String.t(),
+          list(Multipart.field()),
+          list({String.t(), String.t()})
+        ) ::
+          {:ok, map()} | {:error, Error.t()}
+  def post_multipart(%Client{} = client, path, fields, extra_headers \\ []) do
+    {boundary, body} = Multipart.encode(fields)
+    headers = [{"content-type", "multipart/form-data; boundary=#{boundary}"} | extra_headers]
+
+    with {:ok, raw_body} <-
+           send_raw(client, :post, client.base_url <> path, IO.iodata_to_binary(body), headers, 0) do
+      decode_body(raw_body)
+    end
+  end
+
+  @doc """
+  Like `get_raw/2`, but for binary (non-text) response bodies — currently only used by
+  `Anthropic.Files.download/2`. `extra_headers` works the same as `post_multipart/4`.
+  """
+  @spec get_binary(Client.t(), path :: String.t(), list({String.t(), String.t()})) ::
+          {:ok, binary()} | {:error, Error.t()}
+  def get_binary(%Client{} = client, path, extra_headers \\ []) do
+    send_raw(client, :get, client.base_url <> path, nil, extra_headers, 0)
+  end
+
+  # Shared by post_multipart/4 and get_binary/3: same retry policy as send_request/6, but
+  # skipping JSON decoding entirely (a multipart response is still JSON — Files.create
+  # returns FileMetadata — but a download response is arbitrary binary, so callers of this
+  # function decode JSON themselves when they know they need to).
+  defp send_raw(client, method, url, body, headers, attempt) do
+    req = Finch.build(method, url, base_headers(client) ++ headers, body)
+
+    case adapter().request(req, client.http_pool, receive_timeout: client.timeout) do
+      {:ok, %Finch.Response{status: 200, body: response_body}} ->
+        {:ok, response_body}
+
+      {:ok, %Finch.Response{status: status, body: response_body, headers: response_headers}} ->
+        error = Error.from_response(status, response_body, response_headers)
+        maybe_retry_raw(client, method, url, body, headers, attempt, error, response_headers)
+
+      {:error, reason} ->
+        error = Error.new(:connection_error, Exception.message(reason))
+        maybe_retry_raw(client, method, url, body, headers, attempt, error, [])
+    end
+  end
+
+  defp maybe_retry_raw(client, method, url, body, headers, attempt, error, response_headers) do
+    if Retry.should_retry?(error, attempt, client.max_retries, response_headers) do
+      Process.sleep(Retry.delay_ms(attempt, response_headers))
+      send_raw(client, method, url, body, headers, attempt + 1)
+    else
+      {:error, error}
+    end
   end
 
   defp send_request(client, method, url, body, attempt, decode: decode?) do
@@ -73,14 +157,15 @@ defmodule Anthropic.HTTPTransport do
 
   @doc false
   def build_request(%Client{} = client, method, url, body \\ nil) do
-    headers =
-      [
-        {"x-api-key", client.api_key},
-        {"anthropic-version", client.api_version},
-        {"content-type", "application/json"}
-      ] ++ client.default_headers
-
+    headers = base_headers(client) ++ [{"content-type", "application/json"}]
     Finch.build(method, url, headers, body)
+  end
+
+  defp base_headers(%Client{} = client) do
+    [
+      {"x-api-key", client.api_key},
+      {"anthropic-version", client.api_version}
+    ] ++ client.default_headers
   end
 
   @doc """

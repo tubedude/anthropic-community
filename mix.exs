@@ -36,6 +36,7 @@ defmodule Anthropic.MixProject do
       {:ex_image_info, "~> 0.2.4"},
       {:telemetry, "~> 1.2"},
       {:nimble_options, "~> 1.1"},
+      {:mime, "~> 2.0"},
       {:mox, "~> 1.1", only: :test},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
