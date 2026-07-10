@@ -217,6 +217,32 @@ Constrain Claude's response to a given JSON Schema:
 
 `Anthropic.Messages.Content.Document` also supports `from_url/2` (a hosted PDF), `from_text/2` (inline plain text), and `from_content/2` (pre-formatted content, for citing structured content rather than a raw document).
 
+### Citations
+
+Pass `citations: %{enabled: true}` to a document (or search-result) block to have Claude cite the specific passages it draws on. Citations come back attached to the response's `Text` blocks, decoded into typed structs:
+
+```elixir
+{:ok, doc} =
+  Anthropic.Messages.Content.Document.process_document("/path/to/report.pdf", :path,
+    citations: %{enabled: true}
+  )
+
+{:ok, message} =
+  Anthropic.Messages.create(client,
+    model: "claude-opus-4-8",
+    max_tokens: 1024,
+    messages: [%{role: "user", content: [doc, %{type: "text", text: "What was Q3 revenue?"}]}]
+  )
+
+for %Anthropic.Messages.Content.Text{citations: citations} <- message.content, citations do
+  for %Anthropic.Messages.Content.Citation.CharLocation{cited_text: cited_text} <- citations do
+    IO.puts("Cited: #{cited_text}")
+  end
+end
+```
+
+Five citation types are supported, discriminated by struct: `Citation.CharLocation`, `Citation.PageLocation`, `Citation.ContentBlockLocation`, `Citation.SearchResultLocation`, `Citation.WebSearchResultLocation`.
+
 ### Models
 
 ```elixir

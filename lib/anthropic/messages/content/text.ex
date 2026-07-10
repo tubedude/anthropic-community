@@ -5,7 +5,7 @@ defmodule Anthropic.Messages.Content.Text do
 
   @type t :: %__MODULE__{
           text: String.t(),
-          citations: list(map()) | nil,
+          citations: list(Anthropic.Messages.Content.Citation.t()) | nil,
           cache_control: map() | nil
         }
 end

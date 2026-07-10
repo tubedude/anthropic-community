@@ -20,7 +20,8 @@ defmodule Anthropic.Messages.Content do
     Thinking,
     RedactedThinking,
     Image,
-    Document
+    Document,
+    Citation
   }
 
   @type t ::
@@ -34,7 +35,11 @@ defmodule Anthropic.Messages.Content do
 
   @spec from_json(map()) :: t() | map()
   def from_json(%{"type" => "text"} = b) do
-    %Text{text: b["text"], citations: b["citations"], cache_control: b["cache_control"]}
+    %Text{
+      text: b["text"],
+      citations: decode_citations(b["citations"]),
+      cache_control: b["cache_control"]
+    }
   end
 
   def from_json(%{"type" => "tool_use"} = b) do
@@ -63,7 +68,13 @@ defmodule Anthropic.Messages.Content do
   @doc "Encodes a content-block struct (or a plain map, passed through unchanged) back to its wire shape."
   @spec to_json(t() | map()) :: map()
   def to_json(%Text{text: text, citations: citations, cache_control: cache_control}) do
-    %{type: "text", text: text, citations: citations, cache_control: cache_control} |> compact()
+    %{
+      type: "text",
+      text: text,
+      citations: encode_citations(citations),
+      cache_control: cache_control
+    }
+    |> compact()
   end
 
   def to_json(%ToolUse{id: id, name: name, input: input, cache_control: cache_control}) do
@@ -135,6 +146,16 @@ defmodule Anthropic.Messages.Content do
 
   defp document_source("content", %Document{content: content}),
     do: %{type: "content", content: content}
+
+  defp decode_citations(nil), do: nil
+
+  defp decode_citations(citations) when is_list(citations),
+    do: Enum.map(citations, &Citation.from_json/1)
+
+  defp encode_citations(nil), do: nil
+
+  defp encode_citations(citations) when is_list(citations),
+    do: Enum.map(citations, &Citation.to_json/1)
 
   defp compact(map), do: Map.reject(map, fn {_k, v} -> is_nil(v) end)
 end

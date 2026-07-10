@@ -15,6 +15,7 @@ Complete rewrite into an official-SDK-style client. Breaking change across the e
 - Extended thinking request config: `Anthropic.Thinking.enabled/1`, `.adaptive/1`, `.disabled/0` build a `:thinking` param for `Messages.create/2`/`stream/2`.
 - Structured outputs: `Anthropic.OutputConfig.json_schema/2` builds an `:output_config` param constraining the response to a given JSON Schema.
 - PDF/document content blocks: `Anthropic.Messages.Content.Document` — `process_document/3` (local PDF), `from_url/2`, `from_text/2`, `from_content/2`.
+- Citations: typed response-side citation structs (`Anthropic.Messages.Content.Citation.{CharLocation, PageLocation, ContentBlockLocation, SearchResultLocation, WebSearchResultLocation}`), decoded from a `Text` block's `:citations` list instead of raw maps and re-encoded correctly if replayed into a later request. Request-side config is the existing `citations: %{enabled: true}` option on `Document`.
 - Added `nimble_options` as a dependency, used to validate `CacheControl`/`Thinking`/`OutputConfig` option shapes with clear error messages.
 
 ### Removed

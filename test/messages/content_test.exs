@@ -3,6 +3,7 @@ defmodule Anthropic.Messages.ContentTest do
 
   alias Anthropic.Messages.Content
   alias Anthropic.Messages.Content.{Text, ToolUse, ToolResult, Thinking, RedactedThinking}
+  alias Anthropic.Messages.Content.Citation.CharLocation
 
   describe "from_json/1" do
     test "decodes a text block" do
@@ -56,6 +57,32 @@ defmodule Anthropic.Messages.ContentTest do
                  "cache_control" => %{"type" => "ephemeral"}
                })
     end
+
+    test "decodes a text block's citations into typed citation structs" do
+      assert %Text{
+               citations: [
+                 %CharLocation{
+                   cited_text: "quoted",
+                   document_index: 0,
+                   start_char_index: 0,
+                   end_char_index: 6
+                 }
+               ]
+             } =
+               Content.from_json(%{
+                 "type" => "text",
+                 "text" => "hi",
+                 "citations" => [
+                   %{
+                     "type" => "char_location",
+                     "cited_text" => "quoted",
+                     "document_index" => 0,
+                     "start_char_index" => 0,
+                     "end_char_index" => 6
+                   }
+                 ]
+               })
+    end
   end
 
   describe "to_json/1 round-trip" do
@@ -89,6 +116,36 @@ defmodule Anthropic.Messages.ContentTest do
     test "unknown map passes through unchanged" do
       raw = %{"type" => "server_tool_use"}
       assert Content.to_json(raw) == raw
+    end
+
+    test "re-encodes a text block's typed citations back to wire maps" do
+      block = %Text{
+        text: "hi",
+        citations: [
+          %CharLocation{
+            cited_text: "quoted",
+            document_index: 0,
+            document_title: nil,
+            end_char_index: 6,
+            file_id: nil,
+            start_char_index: 0
+          }
+        ]
+      }
+
+      assert Content.to_json(block) == %{
+               type: "text",
+               text: "hi",
+               citations: [
+                 %{
+                   type: "char_location",
+                   cited_text: "quoted",
+                   document_index: 0,
+                   end_char_index: 6,
+                   start_char_index: 0
+                 }
+               ]
+             }
     end
   end
 end
