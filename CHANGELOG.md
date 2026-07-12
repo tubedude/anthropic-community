@@ -1,3 +1,8 @@
+## Unreleased
+
+### Added
+- `:telemetry.span/3` around every `Anthropic.HTTPTransport` request attempt (`[:anthropic, :http, :request, :start/:stop/:exception]`), covering `create/2`, `count_tokens/2`, `Models`, `Batches`, and `Files` uniformly since they all funnel through the shared transport layer. Metadata includes `method`, `url`, `attempt` (retry count), and the resulting `status`.
+
 ## 0.5.0 - 2026-07-10
 
 Complete rewrite into an official-SDK-style client. Breaking change across the entire public API — no compatibility shims.
