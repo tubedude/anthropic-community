@@ -116,7 +116,8 @@ defmodule Anthropic.Files do
   @spec retrieve(Client.t(), file_id :: String.t()) ::
           {:ok, file_metadata()} | {:error, Error.t()}
   def retrieve(%Client{} = client, file_id) when is_binary(file_id) do
-    with {:ok, body} <- HTTPTransport.get(client, "/v1/files/#{file_id}", [@beta_header]) do
+    with {:ok, body} <-
+           HTTPTransport.get(client, "/v1/files/#{URI.encode(file_id)}", [@beta_header]) do
       {:ok, from_json(body)}
     end
   end
@@ -124,7 +125,7 @@ defmodule Anthropic.Files do
   @doc "Downloads a file's raw content."
   @spec download(Client.t(), file_id :: String.t()) :: {:ok, binary()} | {:error, Error.t()}
   def download(%Client{} = client, file_id) when is_binary(file_id) do
-    HTTPTransport.get_binary(client, "/v1/files/#{file_id}/content", [
+    HTTPTransport.get_binary(client, "/v1/files/#{URI.encode(file_id)}/content", [
       @beta_header,
       {"accept", "application/binary"}
     ])
@@ -134,7 +135,8 @@ defmodule Anthropic.Files do
   @spec delete(Client.t(), file_id :: String.t()) ::
           {:ok, %{id: String.t(), type: String.t()}} | {:error, Error.t()}
   def delete(%Client{} = client, file_id) when is_binary(file_id) do
-    with {:ok, body} <- HTTPTransport.delete(client, "/v1/files/#{file_id}", [@beta_header]) do
+    with {:ok, body} <-
+           HTTPTransport.delete(client, "/v1/files/#{URI.encode(file_id)}", [@beta_header]) do
       {:ok, %{id: body["id"], type: body["type"]}}
     end
   end

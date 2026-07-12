@@ -2,6 +2,20 @@
 
 Complete rewrite into an official-SDK-style client. Breaking change across the entire public API — no compatibility shims.
 
+### Security
+- `Anthropic.Client` no longer prints `api_key` via `inspect/1` (`@derive {Inspect, except: [:api_key]}`) — previously any crash report, `Logger` metadata, or `IO.inspect`/`dbg` of a client struct leaked the raw key.
+- `Anthropic.Batches.results/2` now refuses to follow a `results_url` whose host doesn't match `Client.base_url`, so a tampered/malicious API response can't redirect the client's `x-api-key` to an attacker-controlled host.
+- `Anthropic.HTTPTransport.Retry.delay_ms/2` now caps `retry-after-ms` at 60 seconds (matching the existing cap on the `retry-after` seconds header) — previously an unbounded header value could block a caller indefinitely via `Process.sleep`.
+- `Anthropic.HTTPTransport.Multipart` now strips CR/LF from a caller-supplied `:content_type` (as it already did for `name`/`filename`), preventing header injection via `Anthropic.Files.create/3`/`create_from_binary/4`.
+
+### Fixed
+- `Anthropic.Messages.Content.Image.process_image/2` now checks a `:path` input's file size against the API's 5MB image limit via `File.stat/1` before reading it into memory, instead of buffering the whole file first.
+- `Anthropic.Batches`/`Anthropic.Files` now `URI.encode/1` path segments built from a caller-supplied id (matching `Anthropic.Models.retrieve/2`, which already did).
+
+### Changed
+- Collapsed `Anthropic.HTTPTransport`'s duplicated `send_request`/`send_raw` request-attempt-and-retry loops into one (`send_raw`), removing a documented "keep both in sync" maintenance hazard.
+- `mix.exs`: added `docs: [main: "readme", extras: [...]]` config so HexDocs gets a proper landing page; `package()` now declares `files:`, `maintainers:`, and a changelog link. Added a top-level `LICENSE` file (Apache-2.0).
+
 ### Added
 - `:telemetry.span/3` around every `Anthropic.HTTPTransport` request attempt (`[:anthropic, :http, :request, :start/:stop/:exception]`), covering `create/2`, `count_tokens/2`, `Models`, `Batches`, and `Files` uniformly since they all funnel through the shared transport layer. Metadata includes `method`, `url`, `attempt` (retry count), and the resulting `status`.
 - `Anthropic.Client` struct (`Client.new/1`), replacing `Anthropic.Config` and the implicit pipeline configuration.

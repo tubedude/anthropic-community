@@ -89,5 +89,17 @@ defmodule Anthropic.HTTPTransport.MultipartTest do
 
       assert encoded =~ ~s(name="weird%22name")
     end
+
+    test "strips CR/LF from content_type so it can't inject extra header lines" do
+      {_boundary, body} =
+        Multipart.encode([
+          {"file", "data", filename: "f.bin", content_type: "text/plain\r\nX-Injected: evil"}
+        ])
+
+      encoded = IO.iodata_to_binary(body)
+
+      assert encoded =~ "Content-Type: text/plainX-Injected: evil\r\n"
+      refute encoded =~ "text/plain\r\nX-Injected"
+    end
   end
 end

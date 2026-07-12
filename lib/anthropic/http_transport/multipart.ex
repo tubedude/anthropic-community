@@ -53,7 +53,7 @@ defmodule Anthropic.HTTPTransport.Multipart do
       escape_quoted_param(filename),
       "\"\r\n",
       "Content-Type: ",
-      content_type,
+      escape_header_value(content_type),
       "\r\n\r\n",
       data,
       "\r\n"
@@ -66,6 +66,14 @@ defmodule Anthropic.HTTPTransport.Multipart do
   defp escape_quoted_param(value) do
     value
     |> String.replace("\"", "%22")
+    |> String.replace("\r", "")
+    |> String.replace("\n", "")
+  end
+
+  # `content_type` (Files.create/2's :content_type option) is interpolated unquoted into a
+  # header line — strip CR/LF so a caller-supplied value can't inject extra header lines.
+  defp escape_header_value(value) do
+    value
     |> String.replace("\r", "")
     |> String.replace("\n", "")
   end

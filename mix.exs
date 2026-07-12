@@ -16,7 +16,8 @@ defmodule Anthropic.MixProject do
       elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      package: package()
+      package: package(),
+      docs: docs()
     ]
   end
 
@@ -45,8 +46,20 @@ defmodule Anthropic.MixProject do
   def package do
     [
       name: @name,
+      files: ~w(lib mix.exs README.md CHANGELOG.md LICENSE),
       licenses: ["Apache-2.0"],
-      links: %{"GitHub" => @repo_url}
+      maintainers: ["Roberto Trevisan"],
+      links: %{
+        "GitHub" => @repo_url,
+        "Changelog" => "#{@repo_url}/blob/main/CHANGELOG.md"
+      }
+    ]
+  end
+
+  defp docs do
+    [
+      main: "readme",
+      extras: ["README.md", "CHANGELOG.md"]
     ]
   end
 end

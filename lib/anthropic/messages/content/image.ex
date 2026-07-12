@@ -52,6 +52,11 @@ defmodule Anthropic.Messages.Content.Image do
     {"1:2", {784, 1568}}
   ]
 
+  # The vision guide caps images at 5MB; reject anything larger before it's read fully
+  # into memory (a :path input otherwise has no upper bound on how much a single
+  # File.read/1 call will buffer).
+  @max_bytes 5 * 1024 * 1024
+
   @type input_type :: :binary | :path | :base64
   @type mime_type :: String.t()
   @type dimensions :: {integer, integer}
@@ -92,6 +97,9 @@ defmodule Anthropic.Messages.Content.Image do
       {:error, {:file_error, reason, path}} ->
         {:error, "Error reading file #{reason} path: #{path}"}
 
+      {:error, {:file_too_large, {size, max_bytes, path}}} ->
+        {:error, "File #{path} is #{size} bytes, exceeding the #{max_bytes}-byte limit."}
+
       {:error, reason} ->
         {:error, "Error occurred: #{inspect(reason)}"}
     end
@@ -102,8 +110,14 @@ defmodule Anthropic.Messages.Content.Image do
   end
 
   defp read_image({:path, image_path}) do
-    case File.read(image_path) do
-      {:ok, _file} = success -> success
+    with {:ok, %File.Stat{size: size}} <- File.stat(image_path),
+         :ok <- check_size(size, image_path) do
+      case File.read(image_path) do
+        {:ok, _file} = success -> success
+        {:error, reason} -> {:error, {:file_error, reason, image_path}}
+      end
+    else
+      {:error, {:file_too_large, _} = reason} -> {:error, reason}
       {:error, reason} -> {:error, {:file_error, reason, image_path}}
     end
   end
@@ -114,6 +128,9 @@ defmodule Anthropic.Messages.Content.Image do
       :error -> {:error, :invalid_base64}
     end
   end
+
+  defp check_size(size, _path) when size <= @max_bytes, do: :ok
+  defp check_size(size, path), do: {:error, {:file_too_large, {size, @max_bytes, path}}}
 
   defp image_to_base64(image_binary) when is_binary(image_binary) do
     base64_data = :base64.encode(image_binary)
