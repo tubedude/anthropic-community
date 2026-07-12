@@ -1,9 +1,8 @@
 defmodule Anthropic.Messages.Content.Image do
   @moduledoc """
-  A module dedicated to processing image content within the [Anthropic ecosystem](https://docs.anthropic.com/claude/docs/vision).
-  This module offers functionality for validating, processing, and converting images to
-  base64 encoded strings, ensuring they meet specific criteria such as supported file types
-  and dimensions.
+  Validates, processes, and converts images into `Anthropic.Messages.Content.Image` request
+  content blocks for use in a user message, per the [vision
+  guide](https://docs.anthropic.com/claude/docs/vision).
 
   ## Features
 
@@ -14,24 +13,35 @@ defmodule Anthropic.Messages.Content.Image do
 
   ## Usage
 
-  The primary entry point to the module is the `process_image/2` function, which takes an image input
-  and an input type. The image input can be specified as a binary data, a file path, or a base64 encoded string.
-  The function returns a structured map with the image's metadata and base64 encoded content if successful,
-  or an error message if not.
+  The primary entry point to the module is `process_image/2`, which takes an image input
+  and an input type and returns a `%Anthropic.Messages.Content.Image{}` struct ready to be
+  embedded directly in a message's `content` list:
+
+      {:ok, image_block} = Anthropic.Messages.Content.Image.process_image("/path/to/image.png", :path)
+
+      Anthropic.Messages.create(client,
+        model: "claude-opus-4-8",
+        max_tokens: 1024,
+        messages: [
+          %{role: "user", content: [image_block, %{type: "text", text: "What's in this image?"}]}
+        ]
+      )
 
   ### Supported Input Types
 
   - `:binary` - Direct binary data of the image.
   - `:path` - A file system path to the image.
   - `:base64` - A base64 encoded string of the image.
-
-  ### Example
-
-      Anthropic.Messages.Content.Image.process_image("/path/to/image.png", :path)
-
-  This function returns an `{:ok, response}` tuple on success, where `response` is a map that includes the type,
-  source type, media type, and base64 data of the image. On failure, it returns `{:error, error_message}`.
   """
+
+  defstruct [:media_type, :data, :cache_control, source_type: "base64"]
+
+  @type t :: %__MODULE__{
+          media_type: String.t(),
+          data: String.t(),
+          source_type: String.t(),
+          cache_control: map() | nil
+        }
 
   @supported_types ["image/jpeg", "image/png", "image/gif", "image/webp"]
   @supported_sizes [
@@ -47,11 +57,12 @@ defmodule Anthropic.Messages.Content.Image do
   @type dimensions :: {integer, integer}
   @type supported_size :: {String.t(), dimensions}
   @type image_input :: binary | String.t()
-  @type process_output :: {:ok, map()} | {:error, String.t()}
+  @type process_output :: {:ok, t()} | {:error, String.t()}
 
   @spec process_image(image_input(), input_type()) :: process_output()
   @doc """
-  Processes the given image input based on the specified input type and converts it into a base64 encoded string.
+  Processes the given image input based on the specified input type and converts it into a
+  `%Anthropic.Messages.Content.Image{}` content block.
 
   ## Parameters
 
@@ -60,13 +71,13 @@ defmodule Anthropic.Messages.Content.Image do
 
   ## Returns
 
-  An `{:ok, response}` tuple containing the processed image information or `{:error, reason}` on failure.
+  An `{:ok, %Anthropic.Messages.Content.Image{}}` tuple on success, or `{:error, reason}` on failure.
   """
   def process_image(image_input, input_type) do
     with {:ok, image_binary} <- read_image({input_type, image_input}),
          {:ok, image_binary, mime_type} <- valid_image(image_binary),
          {:ok, base64_data} <- image_to_base64(image_binary) do
-      {:ok, build_response_object(mime_type, base64_data)}
+      {:ok, %__MODULE__{media_type: mime_type, data: base64_data}}
     else
       {:error, :invalid_base64} ->
         {:error, "Invalid base64 data provided for the image."}
@@ -78,20 +89,11 @@ defmodule Anthropic.Messages.Content.Image do
       {:error, {:unsupported_dimensions, dims}} ->
         {:error, "The provided image dimensions #{inspect(dims)} are not supported."}
 
-      {:error, :no_image_info} ->
-        {:error, "Could not extract image information. The file may not be a valid image."}
-
-      {:error, :unknown_error} ->
-        {:error, "An unknown error occurred during image processing."}
-
       {:error, {:file_error, reason, path}} ->
         {:error, "Error reading file #{reason} path: #{path}"}
 
       {:error, reason} ->
         {:error, "Error occurred: #{inspect(reason)}"}
-
-      _error ->
-        {:error, "An unspecified error occurred during image processing."}
     end
   end
 
@@ -118,17 +120,6 @@ defmodule Anthropic.Messages.Content.Image do
     {:ok, base64_data}
   end
 
-  defp build_response_object(mime_type, base64_data) do
-    %{
-      "type" => "image",
-      "source" => %{
-        "type" => "base64",
-        "media_type" => mime_type,
-        "data" => base64_data
-      }
-    }
-  end
-
   defp valid_image(image_binary) when is_binary(image_binary) do
     with {:image_info, {mime_type, width, height, _variant}} <-
            {:image_info, ExImageInfo.info(image_binary)},
@@ -139,7 +130,6 @@ defmodule Anthropic.Messages.Content.Image do
       {:image_info, var} -> {:error, "no_image_info: #{inspect(var)}"}
       {:error, {:unsupported_type, _mime_type}} = error -> error
       {:error, {:unsupported_dimensions, _}} = error -> error
-      _ -> {:error, :unknown_error}
     end
   end
 
