@@ -227,7 +227,6 @@ defmodule Anthropic do
     add_message(%Request{} = request, :assistant, message)
   end
 
-
   @doc """
   Adds an image message to the request.
 
@@ -477,21 +476,27 @@ defmodule Anthropic do
   end
 
   defp process_invocation(tool_name, args, %Request{} = request) do
-    :telemetry.span([:anthropic, :process_invocation], %{request_meta: request.metadata, tool_name: tool_name}, fn ->
-      process_invocation_core(tool_name, args, request)
-    end)
+    :telemetry.span(
+      [:anthropic, :process_invocation],
+      %{request_meta: request.metadata, tool_name: tool_name},
+      fn ->
+        process_invocation_core(tool_name, args, request)
+      end
+    )
   end
 
   defp process_invocation_core(tool_name, args, %Request{} = request) do
-    result = case Enum.find(request.tools, &(&1 == tool_name)) do
-      nil ->
-        {:error, "Tool #{tool_name} not found"}
+    result =
+      case Enum.find(request.tools, &(&1 == tool_name)) do
+        nil ->
+          {:error, "Tool #{tool_name} not found"}
 
-      tool_module ->
-        task = Anthropic.Tools.Utils.execute_async(tool_module, [args])
-        result = Anthropic.Tools.Utils.format_response(task, tool_name)
-        {:ok, result, request}
-    end
+        tool_module ->
+          task = Anthropic.Tools.Utils.execute_async(tool_module, [args])
+          result = Anthropic.Tools.Utils.format_response(task, tool_name)
+          {:ok, result, request}
+      end
+
     {result, %{}}
   end
 end

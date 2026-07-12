@@ -110,7 +110,10 @@ defmodule AnthropicTest do
       assert [
                %{
                  role: :user,
-                 content: [%{"text" => "Message 1", "type" => "text"}, %{"text" => "Message 2", "type" => "text"}]
+                 content: [
+                   %{"text" => "Message 1", "type" => "text"},
+                   %{"text" => "Message 2", "type" => "text"}
+                 ]
                }
              ] = request.messages
     end
