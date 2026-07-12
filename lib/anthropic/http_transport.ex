@@ -13,12 +13,19 @@ defmodule Anthropic.HTTPTransport do
   @spec post(Client.t(), path :: String.t(), params :: map()) ::
           {:ok, map()} | {:error, Error.t()}
   def post(%Client{} = client, path, params) do
-    send_request(client, :post, client.base_url <> path, Jason.encode!(params), 0, decode: true)
+    headers = [{"content-type", "application/json"}]
+
+    with {:ok, raw_body} <-
+           send_raw(client, :post, client.base_url <> path, Jason.encode!(params), headers, 0) do
+      decode_body(raw_body)
+    end
   end
 
   @spec get(Client.t(), path :: String.t()) :: {:ok, map()} | {:error, Error.t()}
   def get(%Client{} = client, path) do
-    send_request(client, :get, client.base_url <> path, nil, 0, decode: true)
+    with {:ok, raw_body} <- send_raw(client, :get, client.base_url <> path, nil, [], 0) do
+      decode_body(raw_body)
+    end
   end
 
   @doc """
@@ -27,12 +34,14 @@ defmodule Anthropic.HTTPTransport do
   """
   @spec get_raw(Client.t(), url :: String.t()) :: {:ok, String.t()} | {:error, Error.t()}
   def get_raw(%Client{} = client, url) do
-    send_request(client, :get, url, nil, 0, decode: false)
+    send_raw(client, :get, url, nil, [], 0)
   end
 
   @spec delete(Client.t(), path :: String.t()) :: {:ok, map()} | {:error, Error.t()}
   def delete(%Client{} = client, path) do
-    send_request(client, :delete, client.base_url <> path, nil, 0, decode: true)
+    with {:ok, raw_body} <- send_raw(client, :delete, client.base_url <> path, nil, [], 0) do
+      decode_body(raw_body)
+    end
   end
 
   @doc """
@@ -88,16 +97,10 @@ defmodule Anthropic.HTTPTransport do
     send_raw(client, :get, client.base_url <> path, nil, extra_headers, 0)
   end
 
-  # Shared by post_multipart/4, get/3, delete/3, and get_binary/3. Deliberately a separate
-  # orchestration from send_request/maybe_retry (not a shared call), to avoid touching that
-  # already-reviewed JSON+streaming path — it independently calls the same Retry module
-  # functions with the same arguments, so the *policy* is centralized even though the loop
-  # around it is duplicated. If you change retry behavior in maybe_retry/8, check whether
-  # maybe_retry_raw/8 below needs the identical change.
-  #
-  # Skips JSON decoding entirely here: a multipart response is still JSON (Files.create
-  # returns file metadata) but a download response is arbitrary binary, so callers decode
-  # JSON themselves via decode_body/1 when they know they need to.
+  # The single request-attempt + retry loop for every non-streaming request style (post/3,
+  # get/2-3, get_raw/2, delete/2-3, post_multipart/4, get_binary/3). Centralizing this means
+  # header-building, retry/backoff, and error-mapping are defined exactly once — no risk of
+  # a retry-policy change landing in one code path and not another.
   defp send_raw(client, method, url, body, headers, attempt) do
     :telemetry.span(
       [:anthropic, :http, :request],
@@ -144,35 +147,10 @@ defmodule Anthropic.HTTPTransport do
     end
   end
 
-  defp send_request(client, method, url, body, attempt, decode: decode?) do
-    :telemetry.span(
-      [:anthropic, :http, :request],
-      %{method: method, url: url, attempt: attempt},
-      fn ->
-        req = build_request(client, method, url, body)
-
-        case adapter().request(req, client.http_pool, receive_timeout: client.timeout) do
-          {:ok, %Finch.Response{status: 200, body: response_body}} ->
-            result = if decode?, do: decode_body(response_body), else: {:ok, response_body}
-            {result, %{status: 200}}
-
-          {:ok, %Finch.Response{status: status, body: response_body, headers: headers}} ->
-            error = Error.from_response(status, response_body, headers)
-
-            result =
-              maybe_retry(client, method, url, body, attempt, error, headers, decode: decode?)
-
-            {result, %{status: status}}
-
-          {:error, reason} ->
-            error = Error.new(:connection_error, Exception.message(reason))
-            result = maybe_retry(client, method, url, body, attempt, error, [], decode: decode?)
-            {result, %{status: nil, reason: error.type}}
-        end
-      end
-    )
-  end
-
+  # Skips JSON decoding entirely for get_raw/2 and get_binary/3 — a multipart response is
+  # still JSON (Files.create returns file metadata) but a download response is arbitrary
+  # binary, and get_raw/2's caller (Batches.results/2) needs raw JSONL, not a single
+  # document — so callers decode via decode_body/1 only when they know they need to.
   defp decode_body(body) do
     case Jason.decode(body) do
       {:ok, decoded} ->
@@ -180,15 +158,6 @@ defmodule Anthropic.HTTPTransport do
 
       {:error, %Jason.DecodeError{} = reason} ->
         {:error, Error.new(:decode_error, Exception.message(reason))}
-    end
-  end
-
-  defp maybe_retry(client, method, url, body, attempt, error, headers, decode: decode?) do
-    if Retry.should_retry?(error, attempt, client.max_retries, headers) do
-      Process.sleep(Retry.delay_ms(attempt, headers))
-      send_request(client, method, url, body, attempt + 1, decode: decode?)
-    else
-      {:error, error}
     end
   end
 

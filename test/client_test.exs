@@ -64,4 +64,12 @@ defmodule Anthropic.ClientTest do
       assert client.default_headers == []
     end
   end
+
+  describe "inspect/1" do
+    test "never prints the api_key" do
+      client = Client.new(api_key: "sk-ant-super-secret-value")
+
+      refute inspect(client) =~ "sk-ant-super-secret-value"
+    end
+  end
 end

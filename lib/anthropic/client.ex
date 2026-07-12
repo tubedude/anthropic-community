@@ -14,6 +14,7 @@ defmodule Anthropic.Client do
      to `"https://api.anthropic.com"`.
   """
 
+  @derive {Inspect, except: [:api_key]}
   @enforce_keys [:api_key]
   defstruct [
     :api_key,

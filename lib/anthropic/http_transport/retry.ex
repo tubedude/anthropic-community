@@ -7,6 +7,7 @@ defmodule Anthropic.HTTPTransport.Retry do
 
   @initial_delay_ms 500
   @max_delay_ms 8_000
+  @max_retry_after_ms 60_000
 
   @doc """
   Whether attempt number `attempt` (0-indexed) should be retried. A response-level
@@ -42,9 +43,9 @@ defmodule Anthropic.HTTPTransport.Retry do
 
   @doc """
   Computes the delay in milliseconds before the next attempt. Honors a `retry-after-ms`
-  header (preferred, more precise) or `retry-after` header (seconds, sanity-bounded to
-  `0 < seconds <= 60`) when present; otherwise uses exponential backoff — `500ms, 1s, 2s,
-  4s, ...` capped at 8s — with up to 25% negative jitter.
+  header (preferred, more precise, sanity-bounded to `0 < ms <= 60_000`) or `retry-after`
+  header (seconds, sanity-bounded to `0 < seconds <= 60`) when present; otherwise uses
+  exponential backoff — `500ms, 1s, 2s, 4s, ...` capped at 8s — with up to 25% negative jitter.
   """
   @spec delay_ms(attempt :: non_neg_integer(), headers :: list({String.t(), String.t()})) ::
           non_neg_integer()
@@ -64,7 +65,7 @@ defmodule Anthropic.HTTPTransport.Retry do
 
   defp parse_retry_after_ms(value) do
     case Float.parse(value) do
-      {ms, _rest} when ms > 0 -> round(ms)
+      {ms, _rest} when ms > 0 and ms <= @max_retry_after_ms -> round(ms)
       _ -> nil
     end
   end

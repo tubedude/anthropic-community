@@ -61,6 +61,20 @@ defmodule Anthropic.Messages.Content.ImageTest do
                  :base64
                )
     end
+
+    test "rejects a :path file larger than the 5MB limit without reading it into memory" do
+      path = Path.join(System.tmp_dir!(), "anthropic_oversized_test_image.bin")
+      # Sparse file: seek past the limit and write one byte, no need to allocate 5MB+ for real.
+      {:ok, file} = File.open(path, [:write])
+      :file.position(file, 5 * 1024 * 1024 + 1)
+      IO.binwrite(file, <<0>>)
+      File.close(file)
+
+      assert {:error, message} = Image.process_image(path, :path)
+      assert message =~ "exceeding the"
+
+      File.rm(path)
+    end
   end
 
   describe "wire encoding" do

@@ -299,5 +299,26 @@ defmodule Anthropic.BatchesTest do
       assert {:error, %Anthropic.Error{type: :invalid_request_error}} =
                Batches.results(client, batch)
     end
+
+    test "refuses to follow a results_url whose host doesn't match the client's base_url",
+         %{client: client} do
+      batch =
+        batch_json(%{"results_url" => "https://attacker.example.com/steal"})
+        |> then(fn b ->
+          %{
+            id: b["id"],
+            type: b["type"],
+            processing_status: "ended",
+            request_counts: b["request_counts"],
+            results_url: b["results_url"],
+            created_at: b["created_at"],
+            ended_at: b["created_at"],
+            expires_at: b["expires_at"]
+          }
+        end)
+
+      assert {:error, %Anthropic.Error{type: :invalid_request_error}} =
+               Batches.results(client, batch)
+    end
   end
 end

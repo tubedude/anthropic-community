@@ -60,6 +60,11 @@ defmodule Anthropic.HTTPTransport.RetryTest do
       assert ms < 60_000
     end
 
+    test "ignores an out-of-sanity-range retry-after-ms (> 60_000ms) and falls through" do
+      ms = Retry.delay_ms(0, [{"retry-after-ms", "999999999"}])
+      assert ms <= 60_000
+    end
+
     test "ignores a non-positive retry-after and falls through to exponential backoff" do
       assert Retry.delay_ms(0, [{"retry-after", "0"}]) in 375..500
     end

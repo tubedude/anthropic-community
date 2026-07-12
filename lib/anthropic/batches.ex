@@ -56,7 +56,8 @@ defmodule Anthropic.Batches do
   @doc "Retrieves a batch by id."
   @spec retrieve(Client.t(), batch_id :: String.t()) :: {:ok, batch()} | {:error, Error.t()}
   def retrieve(%Client{} = client, batch_id) when is_binary(batch_id) do
-    with {:ok, body} <- Anthropic.HTTPTransport.get(client, "/v1/messages/batches/#{batch_id}") do
+    with {:ok, body} <-
+           Anthropic.HTTPTransport.get(client, "/v1/messages/batches/#{URI.encode(batch_id)}") do
       {:ok, from_json(body)}
     end
   end
@@ -99,7 +100,11 @@ defmodule Anthropic.Batches do
   @spec cancel(Client.t(), batch_id :: String.t()) :: {:ok, batch()} | {:error, Error.t()}
   def cancel(%Client{} = client, batch_id) when is_binary(batch_id) do
     with {:ok, body} <-
-           Anthropic.HTTPTransport.post(client, "/v1/messages/batches/#{batch_id}/cancel", %{}) do
+           Anthropic.HTTPTransport.post(
+             client,
+             "/v1/messages/batches/#{URI.encode(batch_id)}/cancel",
+             %{}
+           ) do
       {:ok, from_json(body)}
     end
   end
@@ -110,7 +115,8 @@ defmodule Anthropic.Batches do
   """
   @spec delete(Client.t(), batch_id :: String.t()) :: {:ok, deleted_batch()} | {:error, Error.t()}
   def delete(%Client{} = client, batch_id) when is_binary(batch_id) do
-    with {:ok, body} <- Anthropic.HTTPTransport.delete(client, "/v1/messages/batches/#{batch_id}") do
+    with {:ok, body} <-
+           Anthropic.HTTPTransport.delete(client, "/v1/messages/batches/#{URI.encode(batch_id)}") do
       {:ok, %{id: body["id"], type: body["type"]}}
     end
   end
@@ -142,7 +148,8 @@ defmodule Anthropic.Batches do
   end
 
   defp fetch_results(client, url) do
-    with {:ok, jsonl} <- Anthropic.HTTPTransport.get_raw(client, url) do
+    with :ok <- verify_same_host(client, url),
+         {:ok, jsonl} <- Anthropic.HTTPTransport.get_raw(client, url) do
       results =
         jsonl
         |> String.split("\n", trim: true)
@@ -150,6 +157,18 @@ defmodule Anthropic.Batches do
         |> Enum.map(&parse_result/1)
 
       {:ok, results}
+    end
+  end
+
+  # `results_url` comes from the API's own JSON response, but `get_raw/2` sends the client's
+  # api_key to whatever URL it's given — refuse to follow it off the configured API host,
+  # so a tampered/malicious response body can't exfiltrate the credential to an attacker host.
+  defp verify_same_host(%Client{base_url: base_url}, url) do
+    if URI.parse(url).host == URI.parse(base_url).host do
+      :ok
+    else
+      {:error,
+       Error.new(:invalid_request_error, "results_url host does not match client base_url")}
     end
   end
 
