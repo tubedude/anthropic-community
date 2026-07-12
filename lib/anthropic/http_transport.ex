@@ -99,20 +99,40 @@ defmodule Anthropic.HTTPTransport do
   # returns file metadata) but a download response is arbitrary binary, so callers decode
   # JSON themselves via decode_body/1 when they know they need to.
   defp send_raw(client, method, url, body, headers, attempt) do
-    req = Finch.build(method, url, base_headers(client) ++ headers, body)
+    :telemetry.span(
+      [:anthropic, :http, :request],
+      %{method: method, url: url, attempt: attempt},
+      fn ->
+        req = Finch.build(method, url, base_headers(client) ++ headers, body)
 
-    case adapter().request(req, client.http_pool, receive_timeout: client.timeout) do
-      {:ok, %Finch.Response{status: 200, body: response_body}} ->
-        {:ok, response_body}
+        case adapter().request(req, client.http_pool, receive_timeout: client.timeout) do
+          {:ok, %Finch.Response{status: 200, body: response_body}} ->
+            {{:ok, response_body}, %{status: 200}}
 
-      {:ok, %Finch.Response{status: status, body: response_body, headers: response_headers}} ->
-        error = Error.from_response(status, response_body, response_headers)
-        maybe_retry_raw(client, method, url, body, headers, attempt, error, response_headers)
+          {:ok, %Finch.Response{status: status, body: response_body, headers: response_headers}} ->
+            error = Error.from_response(status, response_body, response_headers)
 
-      {:error, reason} ->
-        error = Error.new(:connection_error, Exception.message(reason))
-        maybe_retry_raw(client, method, url, body, headers, attempt, error, [])
-    end
+            result =
+              maybe_retry_raw(
+                client,
+                method,
+                url,
+                body,
+                headers,
+                attempt,
+                error,
+                response_headers
+              )
+
+            {result, %{status: status}}
+
+          {:error, reason} ->
+            error = Error.new(:connection_error, Exception.message(reason))
+            result = maybe_retry_raw(client, method, url, body, headers, attempt, error, [])
+            {result, %{status: nil, reason: error.type}}
+        end
+      end
+    )
   end
 
   defp maybe_retry_raw(client, method, url, body, headers, attempt, error, response_headers) do
@@ -125,20 +145,32 @@ defmodule Anthropic.HTTPTransport do
   end
 
   defp send_request(client, method, url, body, attempt, decode: decode?) do
-    req = build_request(client, method, url, body)
+    :telemetry.span(
+      [:anthropic, :http, :request],
+      %{method: method, url: url, attempt: attempt},
+      fn ->
+        req = build_request(client, method, url, body)
 
-    case adapter().request(req, client.http_pool, receive_timeout: client.timeout) do
-      {:ok, %Finch.Response{status: 200, body: response_body}} ->
-        if decode?, do: decode_body(response_body), else: {:ok, response_body}
+        case adapter().request(req, client.http_pool, receive_timeout: client.timeout) do
+          {:ok, %Finch.Response{status: 200, body: response_body}} ->
+            result = if decode?, do: decode_body(response_body), else: {:ok, response_body}
+            {result, %{status: 200}}
 
-      {:ok, %Finch.Response{status: status, body: response_body, headers: headers}} ->
-        error = Error.from_response(status, response_body, headers)
-        maybe_retry(client, method, url, body, attempt, error, headers, decode: decode?)
+          {:ok, %Finch.Response{status: status, body: response_body, headers: headers}} ->
+            error = Error.from_response(status, response_body, headers)
 
-      {:error, reason} ->
-        error = Error.new(:connection_error, Exception.message(reason))
-        maybe_retry(client, method, url, body, attempt, error, [], decode: decode?)
-    end
+            result =
+              maybe_retry(client, method, url, body, attempt, error, headers, decode: decode?)
+
+            {result, %{status: status}}
+
+          {:error, reason} ->
+            error = Error.new(:connection_error, Exception.message(reason))
+            result = maybe_retry(client, method, url, body, attempt, error, [], decode: decode?)
+            {result, %{status: nil, reason: error.type}}
+        end
+      end
+    )
   end
 
   defp decode_body(body) do
