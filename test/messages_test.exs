@@ -40,6 +40,24 @@ defmodule Anthropic.MessagesTest do
     end
   end
 
+  describe "create/2 request headers" do
+    test "sends a user-agent header identifying this library and its version", %{client: client} do
+      Anthropic.MockHTTPAdapter
+      |> expect(:request, fn req, _pool, _opts ->
+        assert {"user-agent", user_agent} = List.keyfind(req.headers, "user-agent", 0)
+        assert user_agent =~ ~r/^anthropic-community-elixir\/\d+\.\d+\.\d+/
+        {:ok, %Finch.Response{status: 200, body: success_body(), headers: []}}
+      end)
+
+      assert {:ok, %Anthropic.Messages.Message{}} =
+               Messages.create(client,
+                 model: "claude-opus-4-8",
+                 max_tokens: 100,
+                 messages: [%{role: "user", content: "Hi"}]
+               )
+    end
+  end
+
   describe "create/2 validation" do
     test "returns a validation error without making a request when max_tokens is missing", %{
       client: client
