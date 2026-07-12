@@ -170,8 +170,16 @@ defmodule Anthropic.HTTPTransport do
   defp base_headers(%Client{} = client) do
     [
       {"x-api-key", client.api_key},
-      {"anthropic-version", client.api_version}
+      {"anthropic-version", client.api_version},
+      {"user-agent", user_agent()}
     ] ++ client.default_headers
+  end
+
+  # Application.spec/2, not Mix.Project.config/0 — Mix isn't guaranteed to be loaded at
+  # runtime outside of :dev/:test (e.g. in a compiled release), while the app spec always is.
+  defp user_agent do
+    version = Application.spec(:anthropic, :vsn) |> to_string()
+    "anthropic-community-elixir/#{version}"
   end
 
   @doc """
