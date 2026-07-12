@@ -1,13 +1,9 @@
-## Unreleased
-
-### Added
-- `:telemetry.span/3` around every `Anthropic.HTTPTransport` request attempt (`[:anthropic, :http, :request, :start/:stop/:exception]`), covering `create/2`, `count_tokens/2`, `Models`, `Batches`, and `Files` uniformly since they all funnel through the shared transport layer. Metadata includes `method`, `url`, `attempt` (retry count), and the resulting `status`.
-
 ## 0.5.0 - 2026-07-10
 
 Complete rewrite into an official-SDK-style client. Breaking change across the entire public API — no compatibility shims.
 
 ### Added
+- `:telemetry.span/3` around every `Anthropic.HTTPTransport` request attempt (`[:anthropic, :http, :request, :start/:stop/:exception]`), covering `create/2`, `count_tokens/2`, `Models`, `Batches`, and `Files` uniformly since they all funnel through the shared transport layer. Metadata includes `method`, `url`, `attempt` (retry count), and the resulting `status`.
 - `Anthropic.Client` struct (`Client.new/1`), replacing `Anthropic.Config` and the implicit pipeline configuration.
 - Typed content blocks: `Anthropic.Messages.Content.{Text, ToolUse, ToolResult, Thinking, RedactedThinking, Image}`.
 - Native tool use via the API's real `tools`/`tool_use`/`tool_result` protocol. `Anthropic.Tools` (JSON Schema `input_schema/0`) replaces `Anthropic.Tools.ToolBehaviour`. `Anthropic.ToolRunner.run/4` drives the full agentic loop, replacing the hand-rolled XML-in-system-prompt hack.
